@@ -1,8 +1,4 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
-
 function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-600 via-indigo-700 to-purple-800 flex items-center justify-center p-8">
