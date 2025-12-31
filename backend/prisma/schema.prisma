@@ -4,7 +4,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
+
+//////////////////////
+// ENUMS GENERALES //
+//////////////////////
 
 enum Role {
   ADMIN
@@ -12,6 +17,103 @@ enum Role {
   OPERATOR
   VIEWER
 }
+
+enum MedioReporte {
+  PERSONAL
+  TELEFONICO
+  ESCRITO
+  CORREO_ELECTRONICO
+  WHATSAPP
+  AUTONOMO
+}
+
+enum TipoPqr {
+  PETICION
+  QUEJA
+  RECLAMO
+  REPORTE
+}
+
+enum EstadoPqr {
+  PENDIENTE
+  EN_PROCESO
+  PROCESADA
+}
+
+enum PrioridadPqr {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+////////////////////////
+// ENUMS INVENTARIO //
+////////////////////////
+
+enum TipoInventario {
+  LUMINARIA
+  POSTE
+  TRANSFORMADOR
+}
+
+enum MaterialApoyo {
+  CONCRETO
+  FIBRA_VIDRIO
+  MADERA
+  METALICO
+}
+
+enum AnguloApoyo {
+  GRADOS_90
+  GRADOS_30
+}
+
+enum AlturaApoyo {
+  M_6_6_7
+  M_4_6_5
+  M_7_6_8
+}
+
+enum ZonaInventario {
+  URBANA
+  RURAL
+}
+
+enum AccesoInventario {
+  VEHICULAR
+  PEATONAL
+}
+
+enum EstadoInventario {
+  ACTIVO
+  SUSPENDIDO
+}
+
+enum PropietarioInventario {
+  MUNICIPIO_YARUMAL
+  ALUMBRADO_YARUMAL_SAS
+}
+
+enum TecnologiaLuminaria {
+  LED
+  SODIO
+  HALOGENA
+}
+
+enum OrientacionLuminaria {
+  HORIZONTAL
+  VERTICAL
+}
+
+enum ControlLuminaria {
+  FOTOCELDA
+  NA
+}
+
+//////////////////
+// MODELOS     //
+//////////////////
 
 model User {
   id        String   @id @default(uuid())
@@ -22,5 +124,125 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  pqrsCreadas Pqr[] @relation("PqrCreador")
+
   @@map("users")
+}
+
+//////////////////
+// PQR          //
+//////////////////
+
+model Pqr {
+  id                    String        @id @default(uuid())
+  prioridad             PrioridadPqr  @default(MEDIA)
+  fechaPqr              DateTime      @default(now())
+  nombreCliente         String
+  telefonoCliente       String?
+  correoCliente         String?
+  medioReporte          MedioReporte
+  tipoPqr               TipoPqr
+  condicion             String?
+  hasSerie              Boolean       @default(false)
+  serieLuminaria        String?
+  direccionPqr          String
+  sectorPqr             String?
+  barrio                String?
+  lat                   Float?
+  lng                   Float?
+  observacionPqr        String?
+  estado                EstadoPqr     @default(PENDIENTE)
+  plazoDias             Int
+  fechaPlazo            DateTime?
+  responsableAtencionId String?
+  usuarioCreadorId      String
+  inventarioId          Int?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  usuarioCreador User        @relation("PqrCreador", fields: [usuarioCreadorId], references: [id])
+  luminaria      Inventario? @relation(fields: [inventarioId], references: [id])
+  historial      PqrHistorial[]
+
+  @@index([estado])
+  @@index([barrio])
+  @@index([tipoPqr])
+  @@map("pqrs")
+}
+
+//////////////////
+// HISTORIAL PQR //
+//////////////////
+
+model PqrHistorial {
+  id         String   @id @default(uuid())
+  pqrId      String
+  proceso    String
+  fecha      DateTime @default(now())
+  usuarioId  String?
+  comentario String?
+
+  pqr Pqr @relation(fields: [pqrId], references: [id])
+
+  @@index([pqrId])
+  @@map("pqr_historial")
+}
+
+//////////////////
+// INVENTARIO   //
+//////////////////
+
+model Inventario {
+  id               Int       @id @default(autoincrement())
+  serie            String    @unique
+  tipo             TipoInventario
+  potencia         Int?
+  medida           Boolean?
+  configuracion    String?
+  trafo            String?
+  voltaje          String?
+  apoyo            String
+  materialApoyo    MaterialApoyo?
+  angulo           AnguloApoyo?
+  altura           AlturaApoyo?
+  zona             ZonaInventario
+  acceso           AccesoInventario
+  direccion        String
+  sector           String
+  barrio           String
+  lat              Float
+  lng              Float
+  fechaIngreso     DateTime  @default(now())
+  estado           EstadoInventario @default(ACTIVO)
+  propietario      PropietarioInventario
+
+  caracteristicaId Int? @unique
+  caracteristica   CaracteristicaLuminaria? @relation(fields: [caracteristicaId], references: [id])
+
+
+  pqrs        Pqr[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([serie])
+  @@index([barrio])
+  @@map("inventario")
+}
+
+//////////////////////////////////
+// CARACTERISTICAS LUMINARIA   //
+//////////////////////////////////
+
+model CaracteristicaLuminaria {
+  id            Int      @id @default(autoincrement())
+  modelo        String
+  fabricante    String
+  serialFabrica String?
+  tecnologia    TecnologiaLuminaria
+  orientacion   OrientacionLuminaria
+  control       ControlLuminaria
+
+  inventario Inventario?
+
+  @@map("caracteristicas_luminaria")
 }
