@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuthStore } from "@/store/authStore";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ChevronLeft, Mail} from "lucide-react";
 
 export default function SignInForm() {
   const [email, setEmail] = useState("admin@ilumap.com");
@@ -28,8 +28,11 @@ export default function SignInForm() {
       const { user, token } = response.data;
       login(user, token);
       navigate("/");
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Error al iniciar sesión. Verifica tus credenciales.");
+    } catch (err) {
+      const errorMessage = 
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        "Error al iniciar sesión. Verifica tus credenciales.";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -57,30 +60,6 @@ export default function SignInForm() {
             </p>
           </div>
           <div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
-              <button className="inline-flex items-center justify-center gap-3 py-3 text-sm font-normal text-gray-700 transition-colors bg-gray-100 rounded-lg px-7 hover:bg-gray-200 hover:text-gray-800 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* SVG de Google (mantenlo igual) */}
-                </svg>
-                Sign in with Google
-              </button>
-              <button className="inline-flex items-center justify-center gap-3 py-3 text-sm font-normal text-gray-700 transition-colors bg-gray-100 rounded-lg px-7 hover:bg-gray-200 hover:text-gray-800 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10">
-                <svg width="21" className="fill-current" height="20" viewBox="0 0 21 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* SVG de X (mantenlo igual) */}
-                </svg>
-                Sign in with X
-              </button>
-            </div>
-            <div className="relative py-3 sm:py-5">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200 dark:border-gray-800"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="p-2 text-gray-400 bg-white dark:bg-gray-900 sm:px-5 sm:py-2">
-                  Or
-                </span>
-              </div>
-            </div>
             <form onSubmit={handleSubmit}>
               <div className="space-y-6">
                 <div>
