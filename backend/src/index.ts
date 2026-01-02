@@ -1,4 +1,5 @@
 require('dotenv').config();
+const pqrRoutes = require('./routes/pqrRoutes');
 const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
@@ -14,6 +15,8 @@ app.use(express.json());
 
 // Rutas
 app.use('/api/auth', authRoutes);
+
+app.use('/api/pqr', pqrRoutes);
 
 // Health check
 app.get('/api/health', (req: any, res: any) => {
