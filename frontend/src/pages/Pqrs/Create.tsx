@@ -9,6 +9,14 @@ import PageMeta from "../../components/common/PageMeta";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
+interface Cliente {
+  id: string;
+  nombre: string;
+  telefono: string;
+  correo: string;
+  observacion: string;
+}
+
 interface Inventario {
   serie: string;
   direccion: string;
@@ -18,29 +26,17 @@ interface Inventario {
   lng: number;
 }
 
-interface Cliente {
-  id: string;
-  nombre: string;
-  telefono: string;
-  correo: string;
-  observacion: string;
-}
-
 function LocationMarker({ position, setPosition, setDireccion }: { position: [number, number]; setPosition: (pos: [number, number]) => void; setDireccion: (dir: string) => void }) {
   useMapEvents({
     click(e) {
       const newPos: [number, number] = [e.latlng.lat, e.latlng.lng];
       setPosition(newPos);
 
-      // Reverse geocoding con Nominatim (gratis)
       fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}&zoom=18&addressdetails=1`, {
         headers: { "User-Agent": "ILUMAP-App/1.0" },
       })
         .then(res => res.json())
-        .then(data => {
-          const addr = data.display_name || "Dirección no encontrada";
-          setDireccion(addr);
-        })
+        .then(data => setDireccion(data.display_name || "Dirección no encontrada"))
         .catch(() => setDireccion("Error al obtener dirección"));
     },
   });
@@ -52,10 +48,17 @@ export default function PqrCreate() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const [clienteQuery, setClienteQuery] = useState("");
+  const [documentoQuery, setDocumentoQuery] = useState("");
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [editCliente, setEditCliente] = useState(false);
-  const [nuevoClienteId, setNuevoClienteId] = useState("");
+  const [showNewClientModal, setShowNewClientModal] = useState(false);
+  const [newCliente, setNewCliente] = useState({
+    id: "",
+    nombre: "",
+    telefono: "",
+    correo: "",
+    observacion: "",
+  });
 
   const [formData, setFormData] = useState({
     fechaPqr: format(new Date(), 'yyyy-MM-ddTHH:mm'),
@@ -75,12 +78,12 @@ export default function PqrCreate() {
   const [position, setPosition] = useState<[number, number]>([formData.lat, formData.lng]);
   const [searchSerie, setSearchSerie] = useState("");
 
-  // Búsqueda clientes
+  // Búsqueda clientes por documento
   const { data: clientes = [] } = useQuery<Cliente[]>({
-    queryKey: ["clientes", clienteQuery],
+    queryKey: ["clientes", documentoQuery],
     queryFn: async () => {
-      if (!clienteQuery) return [];
-      const response = await axios.get(`http://localhost:5000/api/pqr/clientes/search?q=${clienteQuery}`, {
+      if (!documentoQuery) return [];
+      const response = await axios.get(`http://localhost:5000/api/pqr/clientes/search?q=${documentoQuery}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       return response.data;
@@ -118,9 +121,24 @@ export default function PqrCreate() {
     }
   };
 
-  const mutation = useMutation({
-    mutationFn: async (submitData: any) => {
-      const response = await axios.post("http://localhost:5000/api/pqr", submitData, {
+  const createClienteMutation = useMutation({
+    mutationFn: async (newClienteData: any) => {
+      const response = await axios.post("http://localhost:5000/api/clientes", newClienteData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    },
+    onSuccess: (newCliente) => {
+      setCliente(newCliente);
+      setShowNewClientModal(false);
+      setNewCliente({ id: "", nombre: "", telefono: "", correo: "", observacion: "" });
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+    },
+  });
+
+  const pqrMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await axios.post("http://localhost:5000/api/pqr", data, {
         headers: { Authorization: `Bearer ${token}` },
       });
       return response.data;
@@ -137,16 +155,11 @@ export default function PqrCreate() {
 
     const submitData = {
       ...formData,
-      clienteId: cliente?.id || nuevoClienteId,
-      nombreCliente: cliente?.nombre || "",
-      telefonoCliente: cliente?.telefono || "",
-      correoCliente: cliente?.correo || "",
-      observacionCliente: cliente?.observacion || "",
-      nuevoClienteId: nuevoClienteId || undefined,
+      clienteId: cliente?.id,
       editCliente,
     };
 
-    mutation.mutate(submitData);
+    pqrMutation.mutate(submitData);
   };
 
   const handleCancel = () => {
@@ -169,81 +182,115 @@ export default function PqrCreate() {
               </h3>
             </div>
             <form onSubmit={handleSubmit} className="p-6.5">
-              {/* Búsqueda cliente */}
+              {/* Búsqueda cliente por documento */}
               <div className="mb-4.5">
                 <label className="mb-2.5 block text-black dark:text-white">
-                  Buscar cliente por ID, teléfono o nombre
+                  Cliente (documento) <span className="text-meta-1">*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="Buscar cliente..."
-                  value={clienteQuery}
-                  onChange={(e) => setClienteQuery(e.target.value)}
-                  className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar por documento..."
+                    value={documentoQuery}
+                    onChange={(e) => setDocumentoQuery(e.target.value)}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 pl-11 pr-4 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  />
+                  <svg className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+
                 <select
                   value={cliente?.id || ""}
                   onChange={(e) => {
                     const selected = clientes.find((cl) => cl.id === e.target.value);
                     setCliente(selected || null);
                   }}
-                  className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  className="w-full mt-3 rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
                 >
                   <option value="">Selecciona un cliente</option>
                   {clientes.map((cl) => (
                     <option key={cl.id} value={cl.id}>
-                      {cl.id} - {cl.nombre} ({cl.telefono || "Sin teléfono"})
+                      {cl.id}
                     </option>
                   ))}
+                  {clientes.length === 0 && documentoQuery && (
+                    <option value="" disabled className="text-red-500">
+                      Cliente no encontrado. <span className="text-primary cursor-pointer" onClick={() => setShowNewClientModal(true)}>Agregar nuevo</span>
+                    </option>
+                  )}
                 </select>
               </div>
 
-              {/* Crear nuevo cliente si no existe */}
-              {!cliente && clienteQuery && clientes.length === 0 && (
-                <div className="mb-4.5 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded">
-                  <p className="text-yellow-800 dark:text-yellow-200 mb-3">
-                    Cliente no encontrado. Crea uno nuevo:
-                  </p>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Documento (ID)"
-                    value={nuevoClienteId}
-                    onChange={(e) => setNuevoClienteId(e.target.value)}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
-                  />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nombre"
-                    value={formData.nombreCliente || ""}
-                    onChange={(e) => setFormData({ ...formData, nombreCliente: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
-                  />
-                  <input
-                    type="tel"
-                    placeholder="Teléfono"
-                    value={formData.telefonoCliente || ""}
-                    onChange={(e) => setFormData({ ...formData, telefonoCliente: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Correo"
-                    value={formData.correoCliente || ""}
-                    onChange={(e) => setFormData({ ...formData, correoCliente: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
-                  />
-                  <textarea
-                    placeholder="Observación del cliente"
-                    value={formData.observacionCliente || ""}
-                    onChange={(e) => setFormData({ ...formData, observacionCliente: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                  />
+              {/* Modal nuevo cliente */}
+              {showNewClientModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                  <div className="w-full max-w-md rounded-lg bg-white shadow-lg dark:bg-boxdark p-6">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-medium text-black dark:text-white">Personal Information</h3>
+                      <button onClick={() => setShowNewClientModal(false)} className="text-gray-500 hover:text-gray-700">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="space-y-4">
+                      <input
+                        type="text"
+                        placeholder="Documento (ID)"
+                        value={newCliente.id}
+                        onChange={(e) => setNewCliente({ ...newCliente, id: e.target.value })}
+                        className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Nombre"
+                        value={newCliente.nombre}
+                        onChange={(e) => setNewCliente({ ...newCliente, nombre: e.target.value })}
+                        className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                      />
+                      <input
+                        type="tel"
+                        placeholder="Teléfono"
+                        value={newCliente.telefono}
+                        onChange={(e) => setNewCliente({ ...newCliente, telefono: e.target.value })}
+                        className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Correo"
+                        value={newCliente.correo}
+                        onChange={(e) => setNewCliente({ ...newCliente, correo: e.target.value })}
+                        className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                      />
+                      <textarea
+                        placeholder="Observación"
+                        value={newCliente.observacion}
+                        onChange={(e) => setNewCliente({ ...newCliente, observacion: e.target.value })}
+                        className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-4 mt-6">
+                      <button
+                        type="button"
+                        onClick={() => setShowNewClientModal(false)}
+                        className="rounded border border-stroke py-2 px-6 font-medium text-black hover:shadow-1 dark:border-strokedark dark:text-white"
+                      >
+                        Close
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => createClienteMutation.mutate(newCliente)}
+                        className="rounded bg-primary py-2 px-6 text-white font-medium hover:bg-opacity-90"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* Editar cliente existente */}
+              {/* Información cliente (solo lectura + edición) */}
               {cliente && (
                 <div className="mb-4.5">
                   <div className="flex items-center gap-4 mb-3">
@@ -258,6 +305,12 @@ export default function PqrCreate() {
                       Editar información del cliente
                     </label>
                   </div>
+                  <input
+                    type="text"
+                    disabled
+                    value={cliente.id}
+                    className="w-full rounded border-[1.5px] border-stroke bg-gray dark:bg-meta-4 py-3 px-5 text-black dark:text-white mb-3"
+                  />
                   <input
                     type="text"
                     disabled={!editCliente}
@@ -378,6 +431,9 @@ export default function PqrCreate() {
                       </option>
                     ))}
                   </select>
+                  {searchSerie && filteredSeries.length === 0 && (
+                    <p className="text-red-500 mt-2">La serie no existe</p>
+                  )}
                 </div>
               )}
 
@@ -457,10 +513,10 @@ export default function PqrCreate() {
                 </button>
                 <button
                   type="submit"
-                  disabled={mutation.isPending}
+                  disabled={pqrMutation.isPending}
                   className="rounded bg-primary py-3 px-8 text-white font-medium hover:bg-opacity-90 disabled:opacity-70"
                 >
-                  {mutation.isPending ? "Creando..." : "Crear PQR"}
+                  {pqrMutation.isPending ? "Creando..." : "Crear PQR"}
                 </button>
               </div>
             </form>

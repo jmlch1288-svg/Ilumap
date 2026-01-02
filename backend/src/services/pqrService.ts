@@ -13,6 +13,42 @@ class PqrService {
     return plazos[tipoPqr] || 10;
   }
 
+  async createCliente(data: any) {
+    return await prisma.cliente.create({
+      data: {
+        id: data.id,
+        nombre: data.nombre,
+        telefono: data.telefono,
+        correo: data.correo,
+        observacion: data.observacion,
+      },
+    });
+  }
+
+  async updateCliente(id: string, data: any) {
+    return await prisma.cliente.update({
+      where: { id },
+      data: {
+        nombre: data.nombre,
+        telefono: data.telefono,
+        correo: data.correo,
+        observacion: data.observacion,
+      },
+    });
+  }
+
+  async searchClientes(query: string) {
+    return await prisma.cliente.findMany({
+      where: {
+        OR: [
+          { id: { contains: query } },
+          { telefono: { contains: query } },
+          { nombre: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+    });
+  }
+
   async createPqr(data: any, usuarioId: string) {
     const plazoDias = this.getPlazoDias(data.tipoPqr);
     const fechaPlazo = new Date(data.fechaPqr || new Date());

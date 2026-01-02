@@ -131,14 +131,17 @@ model User {
 
 // Tabla Cliente (nueva)
 model Cliente {
-  id          String   @id // Documento de identidad (único)
+  id          String   @id // Documento de identidad
   nombre      String
   telefono   String?
   correo      String?
-  observacion String?  // Nota adicional
-  pqrs        Pqr[]   // Un cliente puede tener muchas PQRs
+  observacion String?
+
+  pqrs        Pqr[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
   @@map("clientes")
 }
 
@@ -150,7 +153,7 @@ model Pqr {
   id                    String    @id @default(uuid())
   prioridad             PrioridadPqr @default(MEDIA)
   fechaPqr              DateTime  @default(now())
-  clienteId             String?   // Relación con Cliente
+  clienteId             String
   medioReporte          MedioReporte
   tipoPqr               TipoPqr
   condicion             String?
@@ -171,7 +174,7 @@ model Pqr {
   updatedAt             DateTime  @updatedAt
 
   usuarioCreador        User      @relation("PqrCreador", fields: [usuarioCreadorId], references: [id])
-  cliente               Cliente?  @relation(fields: [clienteId], references: [id])
+  cliente               Cliente   @relation(fields: [clienteId], references: [id])
   luminaria             Inventario? @relation(fields: [serieLuminaria], references: [serie])
   historial             PqrHistorial[]
 
