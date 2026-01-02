@@ -2,62 +2,56 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 class PqrService {
-  // ... getPlazoDias igual
+  // Cálculo de plazo según tipoPqr
+  getPlazoDias(tipoPqr: string): number {
+    const plazos: { [key: string]: number } = {
+      PETICION: 5,
+      QUEJA: 15,
+      RECLAMO: 15,
+      REPORTE: 3,
+    };
+    return plazos[tipoPqr] || 10;
+  }
 
-  async createPqr(data, usuarioId) {
-    let clienteId = data.clienteId;
-
-    if (data.nuevoClienteId) {
-      // Crear nuevo cliente
-      const cliente = await prisma.cliente.create({
-        data: {
-          id: data.nuevoClienteId,
-          nombre: data.nombreCliente,
-          telefono: data.telefonoCliente,
-          correo: data.correoCliente,
-          observacion: data.observacionCliente,
-        },
-      });
-      clienteId = cliente.id;
-    } else if (data.editCliente && data.clienteId) {
-      // Actualizar cliente existente
-      await prisma.cliente.update({
-        where: { id: data.clienteId },
-        data: {
-          nombre: data.nombreCliente,
-          telefono: data.telefonoCliente,
-          correo: data.correoCliente,
-          observacion: data.observacionCliente,
-        },
-      });
-    }
-
+  async createPqr(data: any, usuarioId: string) {
     const plazoDias = this.getPlazoDias(data.tipoPqr);
-    const fechaPqr = data.fechaPqr ? new Date(data.fechaPqr) : new Date();
-    const fechaPlazo = new Date(fechaPqr);
+    const fechaPlazo = new Date(data.fechaPqr || new Date());
     fechaPlazo.setDate(fechaPlazo.getDate() + plazoDias);
 
-    // ... luminariaData igual
+    // Si tiene serie, buscar luminaria y autocompletar datos
+    let luminariaData: any = {};
+    if (data.hasSerie && data.serieLuminaria) {
+      const luminaria = await prisma.inventario.findUnique({
+        where: { serie: data.serieLuminaria },
+      });
+      if (!luminaria) {
+        throw new Error('Serie de luminaria no encontrada en inventario');
+      }
+      luminariaData = {
+        direccionPqr: luminaria.direccion,
+        sectorPqr: luminaria.sector,
+        barrio: luminaria.barrio,
+        lat: luminaria.lat,
+        lng: luminaria.lng,
+      };
+    }
 
     const pqr = await prisma.pqr.create({
       data: {
         ...data,
         ...luminariaData,
-        clienteId,
-        fechaPqr,
         plazoDias,
         fechaPlazo,
         usuarioCreadorId: usuarioId,
         estado: 'PENDIENTE',
       },
       include: {
-        cliente: true,
         usuarioCreador: { select: { name: true, email: true } },
         luminaria: true,
       },
     });
 
-    // Historial automático
+    // Guardar historial automático de Registro
     await prisma.pqrHistorial.create({
       data: {
         pqrId: pqr.id,
@@ -69,20 +63,44 @@ class PqrService {
     return pqr;
   }
 
-  // Método para buscar clientes por id, telefono o nombre
-  async searchClientes(query) {
-    return await prisma.cliente.findMany({
-      where: {
-        OR: [
-          { id: { contains: query } },
-          { telefono: { contains: query } },
-          { nombre: { contains: query, mode: 'insensitive' } },
-        ],
+  async getPqrs(filters: any = {}) {
+    return await prisma.pqr.findMany({
+      where: filters,
+      include: {
+        usuarioCreador: { select: { name: true } },
+        luminaria: true,
+        historial: { orderBy: { fecha: 'asc' } },
       },
+      orderBy: { fechaPqr: 'desc' },
     });
   }
 
-  // ... getPqrs y updateEstadoPqr iguales
+  async updateEstadoPqr(pqrId: string, nuevoEstado: string, usuarioId: string, comentario: string = '') {
+    const procesos: { [key: string]: string } = {
+      ASIGNACION: 'Asignación',
+      INTERVENCION: 'Intervención',
+      REVISION: 'Revisión',
+      CIERRE: 'Cierre',
+    };
+
+    const pqr = await prisma.pqr.update({
+      where: { id: pqrId },
+      data: { estado: nuevoEstado as any },
+    });
+
+    // Guardar historial del cambio
+    const proceso = procesos[nuevoEstado] || 'Cambio de estado';
+    await prisma.pqrHistorial.create({
+      data: {
+        pqrId,
+        proceso,
+        usuarioId,
+        comentario,
+      },
+    });
+
+    return pqr;
+  }
 }
 
 module.exports = new PqrService();

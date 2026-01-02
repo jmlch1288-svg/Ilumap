@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 
 interface Inventario {
   serie: string;
@@ -25,23 +26,25 @@ interface Cliente {
   observacion: string;
 }
 
-function LocationMarker({ lat, lng, setLatLng, setDireccion }: { lat: number; lng: number; setLatLng: (lat: number, lng: number) => void; setDireccion: (dir: string) => void }) {
+function LocationMarker({ position, setPosition, setDireccion }: { position: [number, number]; setPosition: (pos: [number, number]) => void; setDireccion: (dir: string) => void }) {
   useMapEvents({
     click(e) {
-      const newLat = e.latlng.lat;
-      const newLng = e.latlng.lng;
-      setLatLng(newLat, newLng);
+      const newPos: [number, number] = [e.latlng.lat, e.latlng.lng];
+      setPosition(newPos);
 
-      // Reverse geocoding
-      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}&zoom=18&addressdetails=1`, {
+      // Reverse geocoding con Nominatim (gratis)
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}&zoom=18&addressdetails=1`, {
         headers: { "User-Agent": "ILUMAP-App/1.0" },
       })
         .then(res => res.json())
-        .then(data => setDireccion(data.display_name || "Dirección no encontrada"))
+        .then(data => {
+          const addr = data.display_name || "Dirección no encontrada";
+          setDireccion(addr);
+        })
         .catch(() => setDireccion("Error al obtener dirección"));
     },
   });
-  return <Marker position={[lat, lng]} />;
+  return position ? <Marker position={position} /> : null;
 }
 
 export default function PqrCreate() {
@@ -55,7 +58,7 @@ export default function PqrCreate() {
   const [nuevoClienteId, setNuevoClienteId] = useState("");
 
   const [formData, setFormData] = useState({
-    fechaPqr: format(new Date(), 'yyyy-MM-ddTHH:mm'), // Fecha automática editable
+    fechaPqr: format(new Date(), 'yyyy-MM-ddTHH:mm'),
     medioReporte: "PERSONAL",
     tipoPqr: "PETICION",
     condicion: "",
@@ -69,12 +72,14 @@ export default function PqrCreate() {
     observacionPqr: "",
   });
 
+  const [position, setPosition] = useState<[number, number]>([formData.lat, formData.lng]);
   const [searchSerie, setSearchSerie] = useState("");
 
   // Búsqueda clientes
   const { data: clientes = [] } = useQuery<Cliente[]>({
     queryKey: ["clientes", clienteQuery],
     queryFn: async () => {
+      if (!clienteQuery) return [];
       const response = await axios.get(`http://localhost:5000/api/pqr/clientes/search?q=${clienteQuery}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -82,15 +87,40 @@ export default function PqrCreate() {
     },
   });
 
-  const handleSelectCliente = (selectedCliente: Cliente) => {
-    setCliente(selectedCliente);
+  // Búsqueda series
+  const { data: inventarios = [] } = useQuery<Inventario[]>({
+    queryKey: ["inventario"],
+    queryFn: async () => {
+      const response = await axios.get("http://localhost:5000/api/inventario", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    },
+  });
+
+  const filteredSeries = inventarios.filter((inv) =>
+    inv.serie.toLowerCase().includes(searchSerie.toLowerCase())
+  );
+
+  const handleSelectSerie = (serie: string) => {
+    const inv = inventarios.find((i) => i.serie === serie);
+    if (inv) {
+      setFormData({
+        ...formData,
+        serieLuminaria: serie,
+        direccionPqr: inv.direccion,
+        sectorPqr: inv.sector,
+        barrio: inv.barrio,
+        lat: inv.lat,
+        lng: inv.lng,
+      });
+      setPosition([inv.lat, inv.lng]);
+    }
   };
 
-  // ... (inventarios, filteredSeries, handleSelectSerie igual)
-
   const mutation = useMutation({
-    mutationFn: async (data) => {
-      const response = await axios.post("http://localhost:5000/api/pqr", data, {
+    mutationFn: async (submitData: any) => {
+      const response = await axios.post("http://localhost:5000/api/pqr", submitData, {
         headers: { Authorization: `Bearer ${token}` },
       });
       return response.data;
@@ -104,6 +134,7 @@ export default function PqrCreate() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
     const submitData = {
       ...formData,
       clienteId: cliente?.id || nuevoClienteId,
@@ -111,9 +142,10 @@ export default function PqrCreate() {
       telefonoCliente: cliente?.telefono || "",
       correoCliente: cliente?.correo || "",
       observacionCliente: cliente?.observacion || "",
-      nuevoClienteId: nuevoClienteId, // Si nuevo
-      editCliente, // Si editar
+      nuevoClienteId: nuevoClienteId || undefined,
+      editCliente,
     };
+
     mutation.mutate(submitData);
   };
 
@@ -160,20 +192,22 @@ export default function PqrCreate() {
                   <option value="">Selecciona un cliente</option>
                   {clientes.map((cl) => (
                     <option key={cl.id} value={cl.id}>
-                      {cl.id} - {cl.nombre} ({cl.telefono})
+                      {cl.id} - {cl.nombre} ({cl.telefono || "Sin teléfono"})
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Si no existe, crear nuevo */}
-              {!cliente && clienteQuery && (
-                <div className="mb-4.5">
-                  <p className="text-red-500 mb-2">Cliente no encontrado. Crea uno nuevo:</p>
+              {/* Crear nuevo cliente si no existe */}
+              {!cliente && clienteQuery && clientes.length === 0 && (
+                <div className="mb-4.5 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                  <p className="text-yellow-800 dark:text-yellow-200 mb-3">
+                    Cliente no encontrado. Crea uno nuevo:
+                  </p>
                   <input
                     type="text"
                     required
-                    placeholder="Documento nuevo"
+                    placeholder="Documento (ID)"
                     value={nuevoClienteId}
                     onChange={(e) => setNuevoClienteId(e.target.value)}
                     className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
@@ -182,21 +216,21 @@ export default function PqrCreate() {
                     type="text"
                     required
                     placeholder="Nombre"
-                    value={formData.nombreCliente}
+                    value={formData.nombreCliente || ""}
                     onChange={(e) => setFormData({ ...formData, nombreCliente: e.target.value })}
                     className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
                   />
                   <input
                     type="tel"
                     placeholder="Teléfono"
-                    value={formData.telefonoCliente}
+                    value={formData.telefonoCliente || ""}
                     onChange={(e) => setFormData({ ...formData, telefonoCliente: e.target.value })}
                     className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
                   />
                   <input
                     type="email"
                     placeholder="Correo"
-                    value={formData.correoCliente}
+                    value={formData.correoCliente || ""}
                     onChange={(e) => setFormData({ ...formData, correoCliente: e.target.value })}
                     className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
                   />
@@ -209,7 +243,7 @@ export default function PqrCreate() {
                 </div>
               )}
 
-              {/* Si existe, mostrar/editar */}
+              {/* Editar cliente existente */}
               {cliente && (
                 <div className="mb-4.5">
                   <div className="flex items-center gap-4 mb-3">
@@ -226,7 +260,6 @@ export default function PqrCreate() {
                   </div>
                   <input
                     type="text"
-                    required
                     disabled={!editCliente}
                     value={cliente.nombre}
                     onChange={(e) => setCliente({ ...cliente, nombre: e.target.value })}
@@ -269,23 +302,165 @@ export default function PqrCreate() {
                 />
               </div>
 
-              {/* ... Resto de campos (medioReporte, tipoPqr, checkbox serie, dropdown serie con búsqueda, dirección, sector, barrio, observación PQR) */}
+              {/* Medio y tipo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5 mb-4.5">
+                <div>
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Medio de reporte
+                  </label>
+                  <select
+                    value={formData.medioReporte}
+                    onChange={(e) => setFormData({ ...formData, medioReporte: e.target.value })}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  >
+                    <option value="PERSONAL">Personal</option>
+                    <option value="TELEFONICO">Telefónico</option>
+                    <option value="ESCRITO">Escrito</option>
+                    <option value="CORREO_ELECTRONICO">Correo Electrónico</option>
+                    <option value="WHATSAPP">Whatsapp</option>
+                    <option value="AUTONOMO">Autónomo</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Tipo de PQR
+                  </label>
+                  <select
+                    value={formData.tipoPqr}
+                    onChange={(e) => setFormData({ ...formData, tipoPqr: e.target.value })}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  >
+                    <option value="PETICION">Petición</option>
+                    <option value="QUEJA">Queja</option>
+                    <option value="RECLAMO">Reclamo</option>
+                    <option value="REPORTE">Reporte</option>
+                  </select>
+                </div>
+              </div>
 
-              {/* Botones guardar/cancelar */}
+              {/* Checkbox serie */}
+              <div className="mb-4.5 flex items-center gap-4">
+                <input
+                  type="checkbox"
+                  id="hasSerie"
+                  checked={formData.hasSerie}
+                  onChange={(e) => setFormData({ ...formData, hasSerie: e.target.checked })}
+                  className="h-5 w-5 rounded border-stroke dark:border-strokedark"
+                />
+                <label htmlFor="hasSerie" className="text-black dark:text-white">
+                  Tiene serie de luminaria?
+                </label>
+              </div>
+
+              {/* Dropdown serie con búsqueda */}
+              {formData.hasSerie && (
+                <div className="mb-4.5">
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Serie de luminaria <span className="text-meta-1">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Buscar serie..."
+                    value={searchSerie}
+                    onChange={(e) => setSearchSerie(e.target.value)}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
+                  />
+                  <select
+                    required
+                    value={formData.serieLuminaria}
+                    onChange={(e) => handleSelectSerie(e.target.value)}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  >
+                    <option value="">Selecciona una serie</option>
+                    {filteredSeries.map((inv) => (
+                      <option key={inv.serie} value={inv.serie}>
+                        {inv.serie} - {inv.direccion}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Dirección, sector, barrio */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5 mb-4.5">
+                <div>
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Dirección <span className="text-meta-1">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.direccionPqr}
+                    onChange={(e) => setFormData({ ...formData, direccionPqr: e.target.value })}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Sector
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.sectorPqr}
+                    onChange={(e) => setFormData({ ...formData, sectorPqr: e.target.value })}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Barrio
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.barrio}
+                    onChange={(e) => setFormData({ ...formData, barrio: e.target.value })}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Mapa */}
+              <div className="mb-4.5">
+                <label className="mb-2.5 block text-black dark:text-white">
+                  Ubicación (click para seleccionar - dirección automática)
+                </label>
+                <div className="h-96 rounded-lg overflow-hidden border border-stroke dark:border-strokedark">
+                  <MapContainer center={position} zoom={13} style={{ height: "100%", width: "100%" }} maxBounds={[[6.80, -75.60], [7.15, -75.25]]} maxBoundsViscosity={1.0} minZoom={11}>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                    <LocationMarker position={position} setPosition={setPosition} setDireccion={(dir) => setFormData({ ...formData, direccionPqr: dir })} />
+                  </MapContainer>
+                </div>
+                <p className="mt-2 text-sm text-meta-5">Dirección detectada: {formData.direccionPqr || "Haz click en el mapa"}</p>
+              </div>
+
+              {/* Observación */}
+              <div className="mb-4.5">
+                <label className="mb-2.5 block text-black dark:text-white">
+                  Observación
+                </label>
+                <textarea
+                  rows={6}
+                  value={formData.observacionPqr}
+                  onChange={(e) => setFormData({ ...formData, observacionPqr: e.target.value })}
+                  className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                />
+              </div>
+
+              {/* Botones */}
               <div className="flex justify-end gap-4.5">
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="flex justify-center rounded border border-stroke py-2 px-6 font-medium text-black hover:shadow-1 dark:border-strokedark dark:text-white"
+                  className="rounded border border-stroke py-3 px-8 font-medium text-black hover:shadow-1 dark:border-strokedark dark:text-white"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={mutation.isPending}
-                  className="flex justify-center rounded bg-primary py-2 px-6 font-medium text-white hover:bg-opacity-90 disabled:opacity-70"
+                  className="rounded bg-primary py-3 px-8 text-white font-medium hover:bg-opacity-90 disabled:opacity-70"
                 >
-                  {mutation.isPending ? "Creando..." : "Guardar"}
+                  {mutation.isPending ? "Creando..." : "Crear PQR"}
                 </button>
               </div>
             </form>
