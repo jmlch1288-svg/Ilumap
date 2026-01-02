@@ -19,6 +19,8 @@ import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PqrList from "./pages/Pqrs/List";
+
 
 export default function App() {
   return (
@@ -26,6 +28,8 @@ export default function App() {
       <Router>
         <ScrollToTop />
         <Routes>
+          ¨{/* Módulo pqrs */}
+          <Route path="/pqrs" element={<PqrList />} />
           {/* Rutas protegidas con layout */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
