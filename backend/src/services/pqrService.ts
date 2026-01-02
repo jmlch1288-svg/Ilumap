@@ -3,8 +3,8 @@ const prisma = new PrismaClient();
 
 class PqrService {
   // Cálculo de plazo según tipoPqr
-  getPlazoDias(tipoPqr) {
-    const plazos = {
+  getPlazoDias(tipoPqr: string): number {
+    const plazos: { [key: string]: number } = {
       PETICION: 5,
       QUEJA: 15,
       RECLAMO: 15,
@@ -13,13 +13,13 @@ class PqrService {
     return plazos[tipoPqr] || 10;
   }
 
-  async createPqr(data, usuarioId) {
+  async createPqr(data: any, usuarioId: string) {
     const plazoDias = this.getPlazoDias(data.tipoPqr);
     const fechaPlazo = new Date(data.fechaPqr || new Date());
     fechaPlazo.setDate(fechaPlazo.getDate() + plazoDias);
 
     // Si tiene serie, buscar luminaria y autocompletar datos
-    let luminariaData = {};
+    let luminariaData: any = {};
     if (data.hasSerie && data.serieLuminaria) {
       const luminaria = await prisma.inventario.findUnique({
         where: { serie: data.serieLuminaria },
@@ -63,7 +63,7 @@ class PqrService {
     return pqr;
   }
 
-  async getPqrs(filters = {}) {
+  async getPqrs(filters: any = {}) {
     return await prisma.pqr.findMany({
       where: filters,
       include: {
@@ -75,8 +75,8 @@ class PqrService {
     });
   }
 
-  async updateEstadoPqr(pqrId, nuevoEstado, usuarioId, comentario = '') {
-    const procesos = {
+  async updateEstadoPqr(pqrId: string, nuevoEstado: string, usuarioId: string, comentario: string = '') {
+    const procesos: { [key: string]: string } = {
       ASIGNACION: 'Asignación',
       INTERVENCION: 'Intervención',
       REVISION: 'Revisión',
@@ -85,7 +85,7 @@ class PqrService {
 
     const pqr = await prisma.pqr.update({
       where: { id: pqrId },
-      data: { estado: nuevoEstado },
+      data: { estado: nuevoEstado as any },
     });
 
     // Guardar historial del cambio
