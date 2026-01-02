@@ -129,21 +129,32 @@ model User {
   @@map("users")
 }
 
+// Tabla Cliente (nueva)
+model Cliente {
+  id          String   @id // Documento de identidad (único)
+  nombre      String
+  telefono   String?
+  correo      String?
+  observacion String?  // Nota adicional
+  pqrs        Pqr[]   // Un cliente puede tener muchas PQRs
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("clientes")
+}
+
 //////////////////
 // PQR          //
 //////////////////
 
 model Pqr {
-  id                    String        @id @default(uuid())
-  prioridad             PrioridadPqr  @default(MEDIA)
-  fechaPqr              DateTime      @default(now())
-  nombreCliente         String
-  telefonoCliente       String?
-  correoCliente         String?
+  id                    String    @id @default(uuid())
+  prioridad             PrioridadPqr @default(MEDIA)
+  fechaPqr              DateTime  @default(now())
+  clienteId             String?   // Relación con Cliente
   medioReporte          MedioReporte
   tipoPqr               TipoPqr
   condicion             String?
-  hasSerie              Boolean       @default(false)
+  hasSerie              Boolean   @default(false)
   serieLuminaria        String?
   direccionPqr          String
   sectorPqr             String?
@@ -151,22 +162,19 @@ model Pqr {
   lat                   Float?
   lng                   Float?
   observacionPqr        String?
-  estado                EstadoPqr     @default(PENDIENTE)
+  estado                EstadoPqr @default(PENDIENTE)
   plazoDias             Int
   fechaPlazo            DateTime?
   responsableAtencionId String?
   usuarioCreadorId      String
-  inventarioId          Int?
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  usuarioCreador User        @relation("PqrCreador", fields: [usuarioCreadorId], references: [id])
-  luminaria      Inventario? @relation(fields: [inventarioId], references: [id])
-  historial      PqrHistorial[]
+  usuarioCreador        User      @relation("PqrCreador", fields: [usuarioCreadorId], references: [id])
+  cliente               Cliente?  @relation(fields: [clienteId], references: [id])
+  luminaria             Inventario? @relation(fields: [serieLuminaria], references: [serie])
+  historial             PqrHistorial[]
 
-  @@index([estado])
-  @@index([barrio])
-  @@index([tipoPqr])
   @@map("pqrs")
 }
 

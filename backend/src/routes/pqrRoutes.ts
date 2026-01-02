@@ -4,6 +4,17 @@ const authMiddleware = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
+// Búsqueda de clientes
+router.get('/clientes/search', authMiddleware, async (req: any, res: any) => {
+  try {
+    const query = req.query.q || '';
+    const clientes = await pqrService.searchClientes(query);
+    res.json(clientes);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Crear PQR
 router.post('/', authMiddleware, async (req: any, res: any) => {
   try {
