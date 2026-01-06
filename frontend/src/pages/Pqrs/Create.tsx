@@ -501,11 +501,108 @@ export default function PqrCreate() {
                   <option value="LA_LOMA">La Loma</option>
                 </select>
               </div>
+              {/* Checkbox serie */}
+              <div className="mb-4.5 flex items-center gap-4">
+                <input
+                  type="checkbox"
+                  id="hasSerie"
+                  checked={formData.hasSerie}
+                  onChange={(e) => setFormData({ ...formData, hasSerie: e.target.checked })}
+                  className="h-5 w-5 rounded border-stroke dark:border-strokedark"
+                />
+                <label htmlFor="hasSerie" className="text-black dark:text-white">
+                  Tiene serie de luminaria?
+                </label>
+              </div>
 
-              {/* Resto del formulario (serie, dirección, mapa, observación, botones) igual */}
+              {/* Dropdown serie con búsqueda */}
+              {formData.hasSerie && (
+                <div className="mb-4.5">
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Serie de luminaria <span className="text-meta-1">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Buscar serie..."
+                    value={searchSerie}
+                    onChange={(e) => setSearchSerie(e.target.value)}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
+                  />
+                  <select
+                    required
+                    value={formData.serieLuminaria}
+                    onChange={(e) => handleSelectSerie(e.target.value)}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  >
+                    <option value="">Selecciona una serie</option>
+                    {filteredSeries.map((inv) => (
+                      <option key={inv.serie} value={inv.serie}>
+                        {inv.serie} - {inv.direccion}
+                      </option>
+                    ))}
+                  </select>
+                  {searchSerie && filteredSeries.length === 0 && (
+                    <p className="text-red-500 mt-2">La serie no existe</p>
+                  )}
+                </div>
+              )}
+
+              {/* Dirección, barrio */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5 mb-4.5">
+                <div>
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Dirección <span className="text-meta-1">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.direccionPqr}
+                    onChange={(e) => setFormData({ ...formData, direccionPqr: e.target.value })}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Barrio
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.barrio}
+                    onChange={(e) => setFormData({ ...formData, barrio: e.target.value })}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Mapa */}
+              <div className="mb-4.5">
+                <label className="mb-2.5 block text-black dark:text-white">
+                  Ubicación (click para seleccionar - dirección automática)
+                </label>
+                <div className="h-96 rounded-lg overflow-hidden border border-stroke dark:border-strokedark">
+                  <MapContainer center={position} zoom={13} style={{ height: "100%", width: "100%" }} maxBounds={[[6.80, -75.60], [7.15, -75.25]]} maxBoundsViscosity={1.0} minZoom={11}>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                    <LocationMarker position={position} setPosition={setPosition} setDireccion={(dir) => setFormData({ ...formData, direccionPqr: dir })} />
+                  </MapContainer>
+                </div>
+                <p className="mt-2 text-sm text-meta-5">Dirección detectada: {formData.direccionPqr || "Haz click en el mapa"}</p>
+              </div>
+
+              {/* Observación */}
+              <div className="mb-4.5">
+                <label className="mb-2.5 block text-black dark:text-white">
+                  Observación
+                </label>
+                <textarea
+                  rows={6}
+                  value={formData.observacionPqr}
+                  onChange={(e) => setFormData({ ...formData, observacionPqr: e.target.value })}
+                  className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                />
+              </div>
 
               {/* Botones */}
-              <div className="flex justify-end gap-4.5 mt-8">
+              <div className="flex justify-end gap-4.5">
                 <button
                   type="button"
                   onClick={handleCancel}
