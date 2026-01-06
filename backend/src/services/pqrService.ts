@@ -65,51 +65,78 @@ class PqrService {
       },
     });
   }
-
   // Crear PQR
   async createPqr(data: any, usuarioId: string) {
     const plazoDias = this.getPlazoDias(data.tipoPqr);
-    const fechaPqr = data.fechaPqr ? new Date(data.fechaPqr) : new Date();
+
+    const fechaPqr = data.fechaPqr
+      ? new Date(data.fechaPqr)
+      : new Date();
+
     const fechaPlazo = new Date(fechaPqr);
     fechaPlazo.setDate(fechaPlazo.getDate() + plazoDias);
 
-    // Autocompletar desde inventario si tiene serie
-    let luminariaData: any = {};
-    if (data.hasSerie && data.serieLuminaria) {
+    // ------------------------------
+    // Datos base de la PQR
+    // ------------------------------
+    const pqrData: any = {
+      clienteId: data.clienteId,
+      medioReporte: data.medioReporte,
+      tipoPqr: data.tipoPqr,
+      condicion: data.condicion,
+      fechaPqr,
+      plazoDias,
+      fechaPlazo,
+      estado: 'PENDIENTE',
+      usuarioCreadorId: usuarioId,
+
+      // Dirección manual (por defecto)
+      direccionPqr: data.direccionPqr,
+      sectorPqr: data.sectorPqr || null,
+      barrio: data.barrio || null,
+      lat: data.lat,
+      lng: data.lng,
+
+      observacionPqr: data.observacionPqr || null,
+    };
+
+    // ------------------------------
+    // Si tiene serie → validar y autocompletar
+    // ------------------------------
+    if (data.hasSerie === true && data.serieLuminaria?.trim()) {
       const luminaria = await prisma.inventario.findUnique({
         where: { serie: data.serieLuminaria },
       });
+
       if (!luminaria) {
         throw new Error('Serie de luminaria no encontrada en inventario');
       }
-      luminariaData = {
-        direccionPqr: luminaria.direccion,
-        sectorPqr: luminaria.sector,
-        barrio: luminaria.barrio,
-        lat: luminaria.lat,
-        lng: luminaria.lng,
-      };
+
+      pqrData.serieLuminaria = data.serieLuminaria;
+      pqrData.direccionPqr = luminaria.direccion;
+      pqrData.sectorPqr = luminaria.sector;
+      pqrData.barrio = luminaria.barrio;
+      pqrData.lat = luminaria.lat;
+      pqrData.lng = luminaria.lng;
     }
 
+    // ------------------------------
+    // Crear PQR
+    // ------------------------------
     const pqr = await prisma.pqr.create({
-      data: {
-        ...data,
-        ...luminariaData,
-        clienteId: data.clienteId,
-        fechaPqr,
-        plazoDias,
-        fechaPlazo,
-        usuarioCreadorId: usuarioId,
-        estado: 'PENDIENTE',
-      },
+      data: pqrData,
       include: {
         cliente: true,
-        usuarioCreador: { select: { name: true, email: true } },
+        usuarioCreador: {
+          select: { name: true, email: true },
+        },
         luminaria: true,
       },
     });
 
-    // Historial automático: Registro
+    // ------------------------------
+    // Historial automático
+    // ------------------------------
     await prisma.pqrHistorial.create({
       data: {
         pqrId: pqr.id,
@@ -120,6 +147,7 @@ class PqrService {
 
     return pqr;
   }
+
 
   // Listar todas las PQRs
   async getPqrs(filters: any = {}) {
