@@ -27,6 +27,13 @@ enum MedioReporte {
   AUTONOMO
 }
 
+enum condicion {
+  APAGADA
+  ENCENDIDA_24H
+  INTERMITENTE
+  POCA_ILUMINACIÓN
+}
+
 enum TipoPqr {
   PETICION
   QUEJA
@@ -39,6 +46,97 @@ enum EstadoPqr {
   EN_PROCESO
   PROCESADA
 }
+
+enum SectorPqr {
+  CABECERA_MUNICIPAL
+  OCHALI
+  EL_PUEBLITO
+  EL_CEDRO
+  CEDENO
+  LLANOS_DE_CUIVA
+  LA_LOMA
+}
+
+¡FELICIDADES ABSOLUTAS! 🎉🎉💡🔥✨
+¡LO LOGRAMOS AL 100%!
+Aquí tienes todo el código completo que solicitaste, listo para copiar y pegar:
+1. backend/prisma/schema.prisma – Enums y campo condición obligatorio
+prismagenerator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TECHNICIAN
+  OPERATOR
+  VIEWER
+}
+
+enum medioReporte {
+  PERSONAL
+  TELEFONICO
+  ESCRITO
+  CORREO_ELECTRONICO
+  WHATSAPP
+  AUTONOMO
+}
+
+enum tipoPqr {
+  PETICION
+  QUEJA
+  RECLAMO
+  REPORTE
+}
+
+enum sectorPqr {
+  CABECERA_MUNICIPAL
+  OCHALI
+  EL_PUEBLITO
+  EL_CEDRO
+  CEDENO
+  LLANOS_DE_CUIVA
+  LA_LOMA
+}
+
+enum condicion {
+  APAGADA
+  ENCENDIDA_24H
+  INTERMITENTE
+  BAJA_INTENSIDAD
+  PARPADEO
+  FALLA_ELECTRICA
+  FALLA_FOTOCONTROL
+  LUMINARIA_DAÑADA
+  LUMINARIA_CAIDA
+  POSTE_INCLINADO
+  POSTE_CAIDO
+  VANDALISMO
+  HURTO_LUMINARIA
+  HURTO_CABLEADO
+  OBSTRUCCION_ARBOL
+  ACCIDENTE_TRANSITO
+  LUMINARIA_INEXISTENTE
+  SOLICITUD_NUEVA
+  REUBICACION
+  APOYO_MUNICIPAL
+  MANTENIMIENTO_PREVENTIVO
+  REVISION_TECNICA
+  RECLAMACION_IAP
+  DERECHO_DE_PETICION
+  INFORMACION
+  OTRO
+  REPOTENCIACION
+  MODERNIZACION
+  RECLAMO_IMPUESTO
+  SERVICIO_AP
+}
+
+
 
 enum PrioridadPqr {
   BAJA
@@ -151,7 +249,7 @@ model Cliente {
 
 model Pqr {
   id                    String    @id @default(uuid())
-  prioridad             PrioridadPqr @default(MEDIA)
+  prioridad             PrioridadPqr @default(BAJA)
   fechaPqr              DateTime  @default(now())
   clienteId             String
   medioReporte          MedioReporte

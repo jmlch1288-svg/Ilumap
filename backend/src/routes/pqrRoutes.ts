@@ -16,7 +16,7 @@ router.get('/clientes/search', authMiddleware, async (req: any, res: any) => {
   }
 });
 
-// Crear cliente (para modal)
+// Crear cliente (para el modal en frontend)
 router.post('/clientes', authMiddleware, async (req: any, res: any) => {
   try {
     const cliente = await pqrService.createCliente(req.body);

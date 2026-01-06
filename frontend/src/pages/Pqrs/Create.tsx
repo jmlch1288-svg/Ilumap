@@ -62,13 +62,13 @@ export default function PqrCreate() {
 
   const [formData, setFormData] = useState({
     fechaPqr: format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'),
-    medioReporte: "PERSONAL",
-    tipoPqr: "PETICION",
+    medioReporte: "PERSONAL" as const,
+    tipoPqr: "PETICION" as const,
     condicion: "",
+    sectorPqr: "CABECERA_MUNICIPAL" as const,
     hasSerie: false,
     serieLuminaria: "",
     direccionPqr: "",
-    sectorPqr: "",
     barrio: "",
     lat: 6.963,
     lng: -75.417,
@@ -78,7 +78,7 @@ export default function PqrCreate() {
   const [position, setPosition] = useState<[number, number]>([formData.lat, formData.lng]);
   const [searchSerie, setSearchSerie] = useState("");
 
-  // Búsqueda clientes por documento
+  // Búsqueda clientes
   const { data: clientes = [], isLoading: loadingClientes } = useQuery<Cliente[]>({
     queryKey: ["clientes", documentoQuery],
     queryFn: async () => {
@@ -112,7 +112,7 @@ export default function PqrCreate() {
         ...formData,
         serieLuminaria: serie,
         direccionPqr: inv.direccion,
-        sectorPqr: inv.sector,
+        sectorPqr: inv.sector as any,
         barrio: inv.barrio,
         lat: inv.lat,
         lng: inv.lng,
@@ -123,7 +123,7 @@ export default function PqrCreate() {
 
   const createClienteMutation = useMutation({
     mutationFn: async (newClienteData: any) => {
-      const response = await axios.post("http://localhost:5000/api/clientes", newClienteData, {
+      const response = await axios.post("http://localhost:5000/api/pqr/clientes", newClienteData, {
         headers: { Authorization: `Bearer ${token}` },
       });
       return response.data;
@@ -158,10 +158,14 @@ export default function PqrCreate() {
       return;
     }
 
+    if (!formData.condicion) {
+      alert("La condición es obligatoria");
+      return;
+    }
+
     const submitData = {
       ...formData,
       clienteId: cliente.id,
-      editCliente,
     };
 
     pqrMutation.mutate(submitData);
@@ -171,6 +175,25 @@ export default function PqrCreate() {
     if (window.confirm("¿Deseas realmente cancelar la creación de la PQR?")) {
       navigate("/pqrs");
     }
+  };
+
+  // Opciones de condición según tipoPqr
+  const getCondiciones = () => {
+    if (formData.tipoPqr === "REPORTE") {
+      return [
+        "APAGADA", "ENCENDIDA_24H", "INTERMITENTE", "BAJA_INTENSIDAD", "PARPADEO",
+        "FALLA_ELECTRICA", "FALLA_FOTOCONTROL", "LUMINARIA_DAÑADA", "LUMINARIA_CAIDA",
+        "POSTE_INCLINADO", "POSTE_CAIDO", "VANDALISMO", "HURTO_LUMINARIA", "HURTO_CABLEADO",
+        "OBSTRUCCION_ARBOL", "ACCIDENTE_TRANSITO", "LUMINARIA_INEXISTENTE", "MANTENIMIENTO_PREVENTIVO"
+      ];
+    }
+    if (formData.tipoPqr === "PETICION") {
+      return ["REPOTENCIACION", "MODERNIZACION", "REUBICACION", "REVISION_TECNICA", "APOYO_MUNICIPAL"];
+    }
+    if (formData.tipoPqr === "RECLAMO") {
+      return ["RECLAMO_IMPUESTO", "SERVICIO_AP"];
+    }
+    return []; // QUEJA u otros
   };
 
   return (
@@ -205,7 +228,6 @@ export default function PqrCreate() {
                   </svg>
                 </div>
 
-                {/* Resultados */}
                 {clientes.length > 0 && (
                   <div className="mt-4 space-y-2">
                     {clientes.map((cl) => (
@@ -221,20 +243,19 @@ export default function PqrCreate() {
                   </div>
                 )}
 
-                {/* Mensaje si no encuentra + botón agregar */}
                 {documentoQuery && clientes.length === 0 && !loadingClientes && (
                   <div className="mt-4">
                     <p className="text-red-500 mb-3">Cliente no encontrado</p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewCliente({ ...newCliente, id: documentoQuery });
-                          setShowNewClientModal(true);
-                        }}
-                        className="rounded bg-brand-600 py-2 px-6 text-white font-medium hover:bg-brand-700"
-                      >
-                        Agregar nuevo cliente
-                      </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewCliente({ ...newCliente, id: documentoQuery });
+                        setShowNewClientModal(true);
+                      }}
+                      className="rounded bg-brand-600 py-2 px-6 text-white font-medium hover:bg-brand-700"
+                    >
+                      Agregar nuevo cliente
+                    </button>
                   </div>
                 )}
               </div>
@@ -372,15 +393,16 @@ export default function PqrCreate() {
                 />
               </div>
 
-              {/* Medio y tipo */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5 mb-4.5">
+              {/* Medio de reporte, Tipo PQR y Condición */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5 mb-4.5">
                 <div>
                   <label className="mb-2.5 block text-black dark:text-white">
-                    Medio de reporte
+                    Medio de reporte <span className="text-meta-1">*</span>
                   </label>
                   <select
+                    required
                     value={formData.medioReporte}
-                    onChange={(e) => setFormData({ ...formData, medioReporte: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, medioReporte: e.target.value as any })}
                     className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
                   >
                     <option value="PERSONAL">Personal</option>
@@ -391,13 +413,17 @@ export default function PqrCreate() {
                     <option value="AUTONOMO">Autónomo</option>
                   </select>
                 </div>
+
                 <div>
                   <label className="mb-2.5 block text-black dark:text-white">
-                    Tipo de PQR
+                    Tipo de PQR <span className="text-meta-1">*</span>
                   </label>
                   <select
+                    required
                     value={formData.tipoPqr}
-                    onChange={(e) => setFormData({ ...formData, tipoPqr: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, tipoPqr: e.target.value as any, condicion: "" });
+                    }}
                     className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
                   >
                     <option value="PETICION">Petición</option>
@@ -406,6 +432,46 @@ export default function PqrCreate() {
                     <option value="REPORTE">Reporte</option>
                   </select>
                 </div>
+
+                <div>
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Condición <span className="text-meta-1">*</span>
+                  </label>
+                  <select
+                    required
+                    value={formData.condicion}
+                    onChange={(e) => setFormData({ ...formData, condicion: e.target.value })}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  >
+                    <option value="">Selecciona condición</option>
+                    {getCondiciones().map((cond) => (
+                      <option key={cond} value={cond}>
+                        {cond.replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Sector */}
+              <div className="mb-4.5">
+                <label className="mb-2.5 block text-black dark:text-white">
+                  Sector <span className="text-meta-1">*</span>
+                </label>
+                <select
+                  required
+                  value={formData.sectorPqr}
+                  onChange={(e) => setFormData({ ...formData, sectorPqr: e.target.value as any })}
+                  className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                >
+                  <option value="CABECERA_MUNICIPAL">Cabecera Municipal</option>
+                  <option value="OCHALI">Ochalí</option>
+                  <option value="EL_PUEBLITO">El Pueblito</option>
+                  <option value="EL_CEDRO">El Cedro</option>
+                  <option value="CEDENO">Cedeño</option>
+                  <option value="LLANOS_DE_CUIVA">Llanos de Cuiva</option>
+                  <option value="LA_LOMA">La Loma</option>
+                </select>
               </div>
 
               {/* Checkbox serie */}
@@ -454,8 +520,8 @@ export default function PqrCreate() {
                 </div>
               )}
 
-              {/* Dirección, sector, barrio */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5 mb-4.5">
+              {/* Dirección, barrio */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5 mb-4.5">
                 <div>
                   <label className="mb-2.5 block text-black dark:text-white">
                     Dirección <span className="text-meta-1">*</span>
@@ -465,17 +531,6 @@ export default function PqrCreate() {
                     required
                     value={formData.direccionPqr}
                     onChange={(e) => setFormData({ ...formData, direccionPqr: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Sector
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.sectorPqr}
-                    onChange={(e) => setFormData({ ...formData, sectorPqr: e.target.value })}
                     className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
                   />
                 </div>
@@ -531,7 +586,7 @@ export default function PqrCreate() {
                 <button
                   type="submit"
                   disabled={pqrMutation.isPending || !cliente}
-                  className="rounded bg-primary py-3 px-8 text-white font-medium hover:bg-opacity-90 disabled:opacity-70"
+                  className="rounded bg-brand-600 py-3 px-8 text-white font-medium hover:bg-opacity-90 disabled:opacity-70"
                 >
                   {pqrMutation.isPending ? "Creando..." : "Crear PQR"}
                 </button>
