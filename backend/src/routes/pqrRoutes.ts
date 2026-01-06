@@ -1,6 +1,6 @@
-const express = require('express');
-const pqrService = require('../services/pqrService');
-const authMiddleware = require('../middlewares/authMiddleware');
+const express = require("express");
+const authMiddleware = require("../middlewares/authMiddleware");
+const pqrService = require("../services/pqrService");
 
 const router = express.Router();
 
@@ -11,7 +11,30 @@ router.get('/clientes/search', authMiddleware, async (req: any, res: any) => {
     const clientes = await pqrService.searchClientes(query);
     res.json(clientes);
   } catch (error: any) {
+    console.error("Error en búsqueda clientes:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Crear cliente (para modal)
+router.post('/clientes', authMiddleware, async (req: any, res: any) => {
+  try {
+    const cliente = await pqrService.createCliente(req.body);
+    res.json(cliente);
+  } catch (error: any) {
+    console.error("Error creando cliente:", error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Listar inventario (para autocomplete serie)
+router.get('/inventario', authMiddleware, async (req: any, res: any) => {
+  try {
+    const inventario = await pqrService.getInventario();
+    res.json(inventario);
+  } catch (error: any) {
+    console.error("Error obteniendo inventario:", error);
+    res.status(500).json({ error: "Error al obtener inventario" });
   }
 });
 
@@ -21,6 +44,7 @@ router.post('/', authMiddleware, async (req: any, res: any) => {
     const pqr = await pqrService.createPqr(req.body, req.user.id);
     res.json(pqr);
   } catch (error: any) {
+    console.error("Error creando PQR:", error);
     res.status(400).json({ error: error.message });
   }
 });
@@ -28,25 +52,11 @@ router.post('/', authMiddleware, async (req: any, res: any) => {
 // Listar PQRs
 router.get('/', authMiddleware, async (req: any, res: any) => {
   try {
-    const filters = req.user.role === 'ADMIN' ? {} : { usuarioCreadorId: req.user.id };
-    const pqrs = await pqrService.getPqrs(filters);
+    const pqrs = await pqrService.getPqrs();
     res.json(pqrs);
   } catch (error: any) {
+    console.error("Error listando PQRs:", error);
     res.status(500).json({ error: error.message });
-  }
-});
-
-// Actualizar estado
-router.patch('/:id/estado', authMiddleware, async (req: any, res: any) => {
-  try {
-    if (!['ADMIN', 'TECHNICIAN'].includes(req.user.role)) {
-      return res.status(403).json({ error: 'Acceso denegado' });
-    }
-    const { estado, comentario } = req.body;
-    const pqr = await pqrService.updateEstadoPqr(req.params.id, estado, req.user.id, comentario);
-    res.json(pqr);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
   }
 });
 

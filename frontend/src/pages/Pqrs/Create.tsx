@@ -61,7 +61,7 @@ export default function PqrCreate() {
   });
 
   const [formData, setFormData] = useState({
-    fechaPqr: format(new Date(), 'yyyy-MM-ddTHH:mm'),
+    fechaPqr: format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'),
     medioReporte: "PERSONAL",
     tipoPqr: "PETICION",
     condicion: "",
@@ -79,10 +79,10 @@ export default function PqrCreate() {
   const [searchSerie, setSearchSerie] = useState("");
 
   // Búsqueda clientes por documento
-  const { data: clientes = [] } = useQuery<Cliente[]>({
+  const { data: clientes = [], isLoading: loadingClientes } = useQuery<Cliente[]>({
     queryKey: ["clientes", documentoQuery],
     queryFn: async () => {
-      if (!documentoQuery) return [];
+      if (!documentoQuery.trim()) return [];
       const response = await axios.get(`http://localhost:5000/api/pqr/clientes/search?q=${documentoQuery}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -94,7 +94,7 @@ export default function PqrCreate() {
   const { data: inventarios = [] } = useQuery<Inventario[]>({
     queryKey: ["inventario"],
     queryFn: async () => {
-      const response = await axios.get("http://localhost:5000/api/inventario", {
+      const response = await axios.get("http://localhost:5000/api/pqr/inventario", {
         headers: { Authorization: `Bearer ${token}` },
       });
       return response.data;
@@ -153,9 +153,14 @@ export default function PqrCreate() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!cliente) {
+      alert("Debes seleccionar o crear un cliente");
+      return;
+    }
+
     const submitData = {
       ...formData,
-      clienteId: cliente?.id,
+      clienteId: cliente.id,
       editCliente,
     };
 
@@ -182,7 +187,7 @@ export default function PqrCreate() {
               </h3>
             </div>
             <form onSubmit={handleSubmit} className="p-6.5">
-              {/* Búsqueda cliente por documento */}
+              {/* Búsqueda cliente */}
               <div className="mb-4.5">
                 <label className="mb-2.5 block text-black dark:text-white">
                   Cliente (documento) <span className="text-meta-1">*</span>
@@ -200,26 +205,38 @@ export default function PqrCreate() {
                   </svg>
                 </div>
 
-                <select
-                  value={cliente?.id || ""}
-                  onChange={(e) => {
-                    const selected = clientes.find((cl) => cl.id === e.target.value);
-                    setCliente(selected || null);
-                  }}
-                  className="w-full mt-3 rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                >
-                  <option value="">Selecciona un cliente</option>
-                  {clientes.map((cl) => (
-                    <option key={cl.id} value={cl.id}>
-                      {cl.id}
-                    </option>
-                  ))}
-                  {clientes.length === 0 && documentoQuery && (
-                    <option value="" disabled className="text-red-500">
-                      Cliente no encontrado. <span className="text-primary cursor-pointer" onClick={() => setShowNewClientModal(true)}>Agregar nuevo</span>
-                    </option>
-                  )}
-                </select>
+                {/* Resultados */}
+                {clientes.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {clientes.map((cl) => (
+                      <div
+                        key={cl.id}
+                        onClick={() => setCliente(cl)}
+                        className="cursor-pointer rounded border border-stroke p-3 hover:bg-gray-50 dark:hover:bg-meta-4"
+                      >
+                        <p className="font-medium">{cl.id} - {cl.nombre}</p>
+                        <p className="text-sm text-meta-5">{cl.telefono || "Sin teléfono"} | {cl.correo || "Sin correo"}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Mensaje si no encuentra + botón agregar */}
+                {documentoQuery && clientes.length === 0 && !loadingClientes && (
+                  <div className="mt-4">
+                    <p className="text-red-500 mb-3">Cliente no encontrado</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewCliente({ ...newCliente, id: documentoQuery });
+                          setShowNewClientModal(true);
+                        }}
+                        className="rounded bg-brand-600 py-2 px-6 text-white font-medium hover:bg-brand-700"
+                      >
+                        Agregar nuevo cliente
+                      </button>
+                  </div>
+                )}
               </div>
 
               {/* Modal nuevo cliente */}
@@ -276,21 +293,21 @@ export default function PqrCreate() {
                         onClick={() => setShowNewClientModal(false)}
                         className="rounded border border-stroke py-2 px-6 font-medium text-black hover:shadow-1 dark:border-strokedark dark:text-white"
                       >
-                        Close
+                        Cerrar
                       </button>
                       <button
                         type="button"
                         onClick={() => createClienteMutation.mutate(newCliente)}
-                        className="rounded bg-primary py-2 px-6 text-white font-medium hover:bg-opacity-90"
+                        className="rounded bg-brand-600 py-2 px-6 text-white font-medium hover:bg-opacity-90"
                       >
-                        Save Changes
+                        Guardar Cambios
                       </button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Información cliente (solo lectura + edición) */}
+              {/* Información del cliente seleccionado */}
               {cliente && (
                 <div className="mb-4.5">
                   <div className="flex items-center gap-4 mb-3">
@@ -513,7 +530,7 @@ export default function PqrCreate() {
                 </button>
                 <button
                   type="submit"
-                  disabled={pqrMutation.isPending}
+                  disabled={pqrMutation.isPending || !cliente}
                   className="rounded bg-primary py-3 px-8 text-white font-medium hover:bg-opacity-90 disabled:opacity-70"
                 >
                   {pqrMutation.isPending ? "Creando..." : "Crear PQR"}
