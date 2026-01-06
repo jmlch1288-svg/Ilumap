@@ -4,6 +4,14 @@ import axios from "axios";
 import { useAuthStore } from "@/store/authStore";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+
+// Componentes oficiales de TailAdmin
+import DefaultInputs from "../../components/form/form-elements/DefaultInputs";
+import InputGroup from "../../components/form/form-elements/InputGroup";
+import SelectInputs from "../../components/form/form-elements/SelectInputs";
+import TextAreaInput from "../../components/form/form-elements/TextAreaInput";
+import { Modal } from "../../components/ui/modal/index"; // ← Tu modal oficial
+
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import { useNavigate } from "react-router-dom";
@@ -26,7 +34,20 @@ interface Inventario {
   lng: number;
 }
 
-function LocationMarker({ position, setPosition, setDireccion }: { position: [number, number]; setPosition: (pos: [number, number]) => void; setDireccion: (dir: string) => void }) {
+const formatConditionLabel = (value: string) => {
+  if (!value) return "Sin condición";
+  return value
+    .toLowerCase()
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+function LocationMarker({ position, setPosition, setDireccion }: { 
+  position: [number, number]; 
+  setPosition: (pos: [number, number]) => void; 
+  setDireccion: (dir: string) => void 
+}) {
   useMapEvents({
     click(e) {
       const newPos: [number, number] = [e.latlng.lat, e.latlng.lng];
@@ -43,15 +64,6 @@ function LocationMarker({ position, setPosition, setDireccion }: { position: [nu
   return position ? <Marker position={position} /> : null;
 }
 
-// Función para formatear texto: Primera letra mayúscula, resto minúscula por palabra
-const formatConditionLabel = (value: string) => {
-  return value
-    .toLowerCase()
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-};
-
 export default function PqrCreate() {
   const { token } = useAuthStore();
   const queryClient = useQueryClient();
@@ -59,7 +71,6 @@ export default function PqrCreate() {
 
   const [documentoQuery, setDocumentoQuery] = useState("");
   const [cliente, setCliente] = useState<Cliente | null>(null);
-  const [editCliente, setEditCliente] = useState(false);
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const [newCliente, setNewCliente] = useState({
     id: "",
@@ -72,10 +83,10 @@ export default function PqrCreate() {
   const [formData, setFormData] = useState({
     fechaPqr: format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'),
     prioridad: "MEDIA" as "ALTA" | "MEDIA" | "BAJA",
-    medioReporte: "PERSONAL" as const,
-    tipoPqr: "PETICION" as const,
+    medioReporte: "PERSONAL",
+    tipoPqr: "PETICION",
     condicion: "",
-    sectorPqr: "CABECERA_MUNICIPAL" as const,
+    sectorPqr: "CABECERA_MUNICIPAL",
     hasSerie: false,
     serieLuminaria: "",
     direccionPqr: "",
@@ -88,7 +99,6 @@ export default function PqrCreate() {
   const [position, setPosition] = useState<[number, number]>([formData.lat, formData.lng]);
   const [searchSerie, setSearchSerie] = useState("");
 
-  // Búsqueda clientes
   const { data: clientes = [], isLoading: loadingClientes } = useQuery<Cliente[]>({
     queryKey: ["clientes", documentoQuery],
     queryFn: async () => {
@@ -100,7 +110,6 @@ export default function PqrCreate() {
     },
   });
 
-  // Búsqueda series
   const { data: inventarios = [] } = useQuery<Inventario[]>({
     queryKey: ["inventario"],
     queryFn: async () => {
@@ -122,7 +131,7 @@ export default function PqrCreate() {
         ...formData,
         serieLuminaria: serie,
         direccionPqr: inv.direccion,
-        sectorPqr: inv.sector as any,
+        sectorPqr: inv.sector,
         barrio: inv.barrio,
         lat: inv.lat,
         lng: inv.lng,
@@ -158,36 +167,22 @@ export default function PqrCreate() {
       alert("PQR creada exitosamente");
       navigate("/pqrs");
     },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || error.message || "Error al crear la PQR");
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!cliente) return alert("Debes seleccionar o crear un cliente");
+    if (!formData.condicion) return alert("La condición es obligatoria");
 
-    if (!cliente) {
-      alert("Debes seleccionar o crear un cliente");
-      return;
-    }
-
-    if (!formData.condicion) {
-      alert("La condición es obligatoria");
-      return;
-    }
-
-    const submitData = {
+    pqrMutation.mutate({
       ...formData,
       clienteId: cliente.id,
-    };
-
-    pqrMutation.mutate(submitData);
+    });
   };
 
-  const handleCancel = () => {
-    if (window.confirm("¿Deseas realmente cancelar la creación de la PQR?")) {
-      navigate("/pqrs");
-    }
-  };
-
-  // Opciones de condición según tipoPqr
   const getCondiciones = () => {
     if (formData.tipoPqr === "REPORTE") {
       return [
@@ -203,7 +198,7 @@ export default function PqrCreate() {
     if (formData.tipoPqr === "RECLAMO") {
       return ["RECLAMO_IMPUESTO", "SERVICIO_AP"];
     }
-    return []; // QUEJA u otros
+    return [];
   };
 
   return (
@@ -219,50 +214,42 @@ export default function PqrCreate() {
                 Información del Cliente y Reporte
               </h3>
             </div>
-            <form onSubmit={handleSubmit} className="p-6.5">
-              {/* Búsqueda cliente */}
-              <div className="mb-4.5">
-                <label className="mb-2.5 block text-black dark:text-white">
-                  Cliente (documento) <span className="text-meta-1">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Buscar por documento..."
-                    value={documentoQuery}
-                    onChange={(e) => setDocumentoQuery(e.target.value)}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 pl-11 pr-4 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                  />
-                  <svg className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
 
+            <form onSubmit={handleSubmit} className="p-6.5 space-y-9">
+              {/* Búsqueda de cliente */}
+              <div>
+                <DefaultInputs
+                  label="Cliente (documento)"
+                  type="text"
+                  placeholder="Ingrese documento para buscar..."
+                  value={documentoQuery}
+                  onChange={(e) => setDocumentoQuery(e.target.value)}
+                  required
+                  icon={
+                    <svg className="fill-current" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                      <path d="M9.16667 3.33333C5.94501 3.33333 3.33334 5.94501 3.33334 9.16667C3.33334 12.3883 5.94501 15 9.16667 15C12.3883 15 15 12.3883 15 9.16667C15 5.94501 12.3883 3.33333 9.16667 3.33333ZM1.66667 9.16667C1.66667 5.02452 5.02452 1.66667 9.16667 1.66667C13.3088 1.66667 16.6667 5.02452 16.6667 9.16667C16.6667 13.3088 13.3088 16.6667 9.16667 16.6667C5.02452 16.6667 1.66667 13.3088 1.66667 9.16667Z" />
+                      <path d="M13.2857 13.2857C13.6112 12.9602 14.1388 12.9602 14.4643 13.2857L18.0893 16.9107C18.4147 17.2362 18.4147 17.7638 18.0893 18.0893C17.7638 18.4147 17.2362 18.4147 16.9107 18.0893L13.2857 14.4643C12.9602 14.1388 12.9602 13.6112 13.2857 13.2857Z" />
+                    </svg>
+                  }
+                />
+
+                {/* Mensajes de estado */}
                 {clientes.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {clientes.map((cl) => (
-                      <div
-                        key={cl.id}
-                        onClick={() => setCliente(cl)}
-                        className="cursor-pointer rounded border border-stroke p-3 hover:bg-gray-50 dark:hover:bg-meta-4"
-                      >
-                        <p className="font-medium">{cl.id} - {cl.nombre}</p>
-                        <p className="text-sm text-meta-5">{cl.telefono || "Sin teléfono"} | {cl.correo || "Sin correo"}</p>
-                      </div>
-                    ))}
+                  <div className="mt-4 rounded-sm border border-success bg-success/10 p-4">
+                    <p className="text-success font-medium">Cliente encontrado</p>
                   </div>
                 )}
 
                 {documentoQuery && clientes.length === 0 && !loadingClientes && (
-                  <div className="mt-4">
-                    <p className="text-red-500 mb-3">Cliente no encontrado</p>
+                  <div className="mt-4 rounded-sm border border-danger bg-danger/10 p-4">
+                    <p className="text-danger font-medium">Cliente no encontrado. Please enter a valid document.</p>
                     <button
                       type="button"
                       onClick={() => {
                         setNewCliente({ ...newCliente, id: documentoQuery });
                         setShowNewClientModal(true);
                       }}
-                      className="rounded bg-brand-600 py-2 px-6 text-white font-medium hover:bg-brand-700"
+                      className="mt-3 inline-flex items-center justify-center rounded-lg bg-primary py-3 px-6 font-medium text-white hover:bg-opacity-90"
                     >
                       Agregar nuevo cliente
                     </button>
@@ -270,350 +257,196 @@ export default function PqrCreate() {
                 )}
               </div>
 
-              {/* Modal nuevo cliente */}
-              {showNewClientModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                  <div className="w-full max-w-md rounded-lg bg-white shadow-lg dark:bg-boxdark p-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-medium text-black dark:text-white">Personal Information</h3>
-                      <button onClick={() => setShowNewClientModal(false)} className="text-gray-500 hover:text-gray-700">
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                    <div className="space-y-4">
-                      <input
-                        type="text"
-                        placeholder="Documento (ID)"
-                        value={newCliente.id}
-                        onChange={(e) => setNewCliente({ ...newCliente, id: e.target.value })}
-                        className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Nombre"
-                        value={newCliente.nombre}
-                        onChange={(e) => setNewCliente({ ...newCliente, nombre: e.target.value })}
-                        className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                      />
-                      <input
-                        type="tel"
-                        placeholder="Teléfono"
-                        value={newCliente.telefono}
-                        onChange={(e) => setNewCliente({ ...newCliente, telefono: e.target.value })}
-                        className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                      />
-                      <input
-                        type="email"
-                        placeholder="Correo"
-                        value={newCliente.correo}
-                        onChange={(e) => setNewCliente({ ...newCliente, correo: e.target.value })}
-                        className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                      />
-                      <textarea
-                        placeholder="Observación"
-                        value={newCliente.observacion}
-                        onChange={(e) => setNewCliente({ ...newCliente, observacion: e.target.value })}
-                        className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                      />
-                    </div>
-                    <div className="flex justify-end gap-4 mt-6">
-                      <button
-                        type="button"
-                        onClick={() => setShowNewClientModal(false)}
-                        className="rounded border border-stroke py-2 px-6 font-medium text-black hover:shadow-1 dark:border-strokedark dark:text-white"
-                      >
-                        Cerrar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => createClienteMutation.mutate(newCliente)}
-                        className="rounded bg-brand-600 py-2 px-6 text-white font-medium hover:bg-opacity-90"
-                      >
-                        Guardar Cambios
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Modal oficial con InputGroup */}
+              <Modal
+                isOpen={showNewClientModal}
+                onClose={() => setShowNewClientModal(false)}
+                className="max-w-2xl p-8"
+              >
+                <h3 className="mb-6 text-xl font-semibold text-black dark:text-white">
+                  Información Personal
+                </h3>
 
-              {/* Información del cliente seleccionado */}
-              {cliente && (
-                <div className="mb-4.5">
-                  <div className="flex items-center gap-4 mb-3">
-                    <input
-                      type="checkbox"
-                      id="editCliente"
-                      checked={editCliente}
-                      onChange={(e) => setEditCliente(e.target.checked)}
-                      className="h-5 w-5 rounded border-stroke dark:border-strokedark"
-                    />
-                    <label htmlFor="editCliente" className="text-black dark:text-white">
-                      Editar información del cliente
-                    </label>
-                  </div>
-                  <input
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <DefaultInputs
+                    label="Documento (ID)"
                     type="text"
-                    disabled
-                    value={cliente.id}
-                    className="w-full rounded border-[1.5px] border-stroke bg-gray dark:bg-meta-4 py-3 px-5 text-black dark:text-white mb-3"
-                  />
-                  <input
-                    type="text"
-                    disabled={!editCliente}
-                    value={cliente.nombre}
-                    onChange={(e) => setCliente({ ...cliente, nombre: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3 disabled:opacity-70"
-                  />
-                  <input
-                    type="tel"
-                    disabled={!editCliente}
-                    value={cliente.telefono}
-                    onChange={(e) => setCliente({ ...cliente, telefono: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3 disabled:opacity-70"
-                  />
-                  <input
-                    type="email"
-                    disabled={!editCliente}
-                    value={cliente.correo}
-                    onChange={(e) => setCliente({ ...cliente, correo: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3 disabled:opacity-70"
-                  />
-                  <textarea
-                    disabled={!editCliente}
-                    value={cliente.observacion}
-                    onChange={(e) => setCliente({ ...cliente, observacion: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary disabled:opacity-70"
-                  />
-                </div>
-              )}
-
-              {/* Fecha PQR + Prioridad */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5 mb-4.5">
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Fecha de PQR <span className="text-meta-1">*</span>
-                  </label>
-                  <input
-                    type="datetime-local"
+                    placeholder="Ingrese documento"
+                    value={newCliente.id}
+                    onChange={(e) => setNewCliente({ ...newCliente, id: e.target.value })}
                     required
+                  />
+
+                  <DefaultInputs
+                    label="Nombre"
+                    type="text"
+                    placeholder="Ingrese nombre completo"
+                    value={newCliente.nombre}
+                    onChange={(e) => setNewCliente({ ...newCliente, nombre: e.target.value })}
+                    required
+                  />
+
+                  <InputGroup
+                    label="Teléfono"
+                    type="tel"
+                    placeholder="Ingrese teléfono"
+                    value={newCliente.telefono}
+                    onChange={(e) => setNewCliente({ ...newCliente, telefono: e.target.value })}
+                    icon={
+                      <svg className="fill-current" width="20" height="20" viewBox="0 0 20 20">
+                        <path d="M13.5833 2.5H6.41667C4.75 2.5 3.33333 3.91667 3.33333 5.58333V14.4167C3.33333 16.0833 4.75 17.5 6.41667 17.5H13.5833C15.25 17.5 16.6667 16.0833 16.6667 14.4167V5.58333C16.6667 3.91667 15.25 2.5 13.5833 2.5ZM10 15.8333C9.08333 15.8333 8.33333 15.0833 8.33333 14.1667C8.33333 13.25 9.08333 12.5 10 12.5C10.9167 12.5 11.6667 13.25 11.6667 14.1667C11.6667 15.0833 10.9167 15.8333 10 15.8333Z" />
+                      </svg>
+                    }
+                  />
+
+                  <InputGroup
+                    label="Correo"
+                    type="email"
+                    placeholder="Ingrese correo electrónico"
+                    value={newCliente.correo}
+                    onChange={(e) => setNewCliente({ ...newCliente, correo: e.target.value })}
+                    icon={
+                      <svg className="fill-current" width="20" height="20" viewBox="0 0 20 20">
+                        <path d="M17.5 15.8333H2.5V6.66667L10 11.6667L17.5 6.66667V15.8333ZM17.5 4.16667H2.5L10 9.16667L17.5 4.16667Z" />
+                      </svg>
+                    }
+                  />
+                </div>
+
+                <div className="mt-6">
+                  <TextAreaInput
+                    label="Observación"
+                    value={newCliente.observacion}
+                    onChange={(e) => setNewCliente({ ...newCliente, observacion: e.target.value })}
+                    rows={4}
+                    placeholder="Ingrese observación adicional"
+                  />
+                </div>
+
+                <div className="mt-8 flex justify-end gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewClientModal(false)}
+                    className="rounded-lg border border-stroke py-3 px-8 font-medium text-black hover:shadow-1 dark:border-strokedark dark:text-white"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => createClienteMutation.mutate(newCliente)}
+                    className="rounded-lg bg-primary py-3 px-8 font-medium text-white hover:bg-opacity-90"
+                  >
+                    Guardar Cambios
+                  </button>
+                </div>
+              </Modal>
+
+              {/* Campos principales del formulario */}
+              <div className="grid grid-cols-1 gap-9 sm:grid-cols-2">
+                <div className="space-y-9">
+                  <DefaultInputs
+                    label="Fecha de PQR"
+                    type="datetime-local"
                     value={formData.fechaPqr}
                     onChange={(e) => setFormData({ ...formData, fechaPqr: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Prioridad <span className="text-meta-1">*</span>
-                  </label>
-                  <select
                     required
+                  />
+
+                  <SelectInputs
+                    label="Prioridad"
                     value={formData.prioridad}
                     onChange={(e) => setFormData({ ...formData, prioridad: e.target.value as any })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                  >
-                    <option value="ALTA">Alta</option>
-                    <option value="MEDIA">Media</option>
-                    <option value="BAJA">Baja</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Medio, Tipo PQR y Condición */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5 mb-4.5">
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Medio de reporte <span className="text-meta-1">*</span>
-                  </label>
-                  <select
+                    options={[
+                      { value: "ALTA", label: "Alta" },
+                      { value: "MEDIA", label: "Media" },
+                      { value: "BAJA", label: "Baja" },
+                    ]}
                     required
+                  />
+                </div>
+
+                <div className="space-y-9">
+                  <SelectInputs
+                    label="Medio de reporte"
                     value={formData.medioReporte}
-                    onChange={(e) => setFormData({ ...formData, medioReporte: e.target.value as any })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                  >
-                    <option value="PERSONAL">Personal</option>
-                    <option value="TELEFONICO">Telefónico</option>
-                    <option value="ESCRITO">Escrito</option>
-                    <option value="CORREO_ELECTRONICO">Correo Electrónico</option>
-                    <option value="WHATSAPP">Whatsapp</option>
-                    <option value="AUTONOMO">Autónomo</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Tipo de PQR <span className="text-meta-1">*</span>
-                  </label>
-                  <select
+                    onChange={(e) => setFormData({ ...formData, medioReporte: e.target.value })}
+                    options={[
+                      { value: "PERSONAL", label: "Personal" },
+                      { value: "TELEFONICO", label: "Telefónico" },
+                      { value: "ESCRITO", label: "Escrito" },
+                      { value: "CORREO_ELECTRONICO", label: "Correo Electrónico" },
+                      { value: "WHATSAPP", label: "Whatsapp" },
+                      { value: "AUTONOMO", label: "Autónomo" },
+                    ]}
                     required
+                  />
+
+                  <SelectInputs
+                    label="Tipo de PQR"
                     value={formData.tipoPqr}
                     onChange={(e) => {
-                      setFormData({ ...formData, tipoPqr: e.target.value as any, condicion: "" });
+                      setFormData({ ...formData, tipoPqr: e.target.value, condicion: "" });
                     }}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                  >
-                    <option value="PETICION">Petición</option>
-                    <option value="QUEJA">Queja</option>
-                    <option value="RECLAMO">Reclamo</option>
-                    <option value="REPORTE">Reporte</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Condición <span className="text-meta-1">*</span>
-                  </label>
-                  <select
+                    options={[
+                      { value: "PETICION", label: "Petición" },
+                      { value: "QUEJA", label: "Queja" },
+                      { value: "RECLAMO", label: "Reclamo" },
+                      { value: "REPORTE", label: "Reporte" },
+                    ]}
                     required
-                    value={formData.condicion}
-                    onChange={(e) => setFormData({ ...formData, condicion: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                  >
-                    <option value="">Selecciona condición</option>
-                    {getCondiciones().map((cond) => (
-                      <option key={cond} value={cond}>
-                        {formatConditionLabel(cond)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Sector */}
-              <div className="mb-4.5">
-                <label className="mb-2.5 block text-black dark:text-white">
-                  Sector <span className="text-meta-1">*</span>
-                </label>
-                <select
-                  required
-                  value={formData.sectorPqr}
-                  onChange={(e) => setFormData({ ...formData, sectorPqr: e.target.value as any })}
-                  className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                >
-                  <option value="CABECERA_MUNICIPAL">Cabecera Municipal</option>
-                  <option value="OCHALI">Ochalí</option>
-                  <option value="EL_PUEBLITO">El Pueblito</option>
-                  <option value="EL_CEDRO">El Cedro</option>
-                  <option value="CEDENO">Cedeño</option>
-                  <option value="LLANOS_DE_CUIVA">Llanos de Cuiva</option>
-                  <option value="LA_LOMA">La Loma</option>
-                </select>
-              </div>
-              {/* Checkbox serie */}
-              <div className="mb-4.5 flex items-center gap-4">
-                <input
-                  type="checkbox"
-                  id="hasSerie"
-                  checked={formData.hasSerie}
-                  onChange={(e) => setFormData({ ...formData, hasSerie: e.target.checked })}
-                  className="h-5 w-5 rounded border-stroke dark:border-strokedark"
-                />
-                <label htmlFor="hasSerie" className="text-black dark:text-white">
-                  Tiene serie de luminaria?
-                </label>
-              </div>
-
-              {/* Dropdown serie con búsqueda */}
-              {formData.hasSerie && (
-                <div className="mb-4.5">
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Serie de luminaria <span className="text-meta-1">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Buscar serie..."
-                    value={searchSerie}
-                    onChange={(e) => setSearchSerie(e.target.value)}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary mb-3"
-                  />
-                  <select
-                    required
-                    value={formData.serieLuminaria}
-                    onChange={(e) => handleSelectSerie(e.target.value)}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                  >
-                    <option value="">Selecciona una serie</option>
-                    {filteredSeries.map((inv) => (
-                      <option key={inv.serie} value={inv.serie}>
-                        {inv.serie} - {inv.direccion}
-                      </option>
-                    ))}
-                  </select>
-                  {searchSerie && filteredSeries.length === 0 && (
-                    <p className="text-red-500 mt-2">La serie no existe</p>
-                  )}
-                </div>
-              )}
-
-              {/* Dirección, barrio */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5 mb-4.5">
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Dirección <span className="text-meta-1">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.direccionPqr}
-                    onChange={(e) => setFormData({ ...formData, direccionPqr: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Barrio
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.barrio}
-                    onChange={(e) => setFormData({ ...formData, barrio: e.target.value })}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
                   />
                 </div>
               </div>
 
-              {/* Mapa */}
-              <div className="mb-4.5">
-                <label className="mb-2.5 block text-black dark:text-white">
-                  Ubicación (click para seleccionar - dirección automática)
-                </label>
-                <div className="h-96 rounded-lg overflow-hidden border border-stroke dark:border-strokedark">
-                  <MapContainer center={position} zoom={13} style={{ height: "100%", width: "100%" }} maxBounds={[[6.80, -75.60], [7.15, -75.25]]} maxBoundsViscosity={1.0} minZoom={11}>
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                    <LocationMarker position={position} setPosition={setPosition} setDireccion={(dir) => setFormData({ ...formData, direccionPqr: dir })} />
-                  </MapContainer>
-                </div>
-                <p className="mt-2 text-sm text-meta-5">Dirección detectada: {formData.direccionPqr || "Haz click en el mapa"}</p>
-              </div>
+              <SelectInputs
+                label="Condición"
+                value={formData.condicion}
+                onChange={(e) => setFormData({ ...formData, condicion: e.target.value })}
+                options={getCondiciones().map(cond => ({
+                  value: cond,
+                  label: formatConditionLabel(cond)
+                }))}
+                placeholder="Selecciona condición"
+                required
+              />
 
-              {/* Observación */}
-              <div className="mb-4.5">
-                <label className="mb-2.5 block text-black dark:text-white">
-                  Observación
-                </label>
-                <textarea
-                  rows={6}
-                  value={formData.observacionPqr}
-                  onChange={(e) => setFormData({ ...formData, observacionPqr: e.target.value })}
-                  className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                />
-              </div>
+              <SelectInputs
+                label="Sector"
+                value={formData.sectorPqr}
+                onChange={(e) => setFormData({ ...formData, sectorPqr: e.target.value })}
+                options={[
+                  { value: "CABECERA_MUNICIPAL", label: "Cabecera Municipal" },
+                  { value: "OCHALI", label: "Ochalí" },
+                  { value: "EL_PUEBLITO", label: "El Pueblito" },
+                  { value: "EL_CEDRO", label: "El Cedro" },
+                  { value: "CEDENO", label: "Cedeño" },
+                  { value: "LLANOS_DE_CUIVA", label: "Llanos de Cuiva" },
+                  { value: "LA_LOMA", label: "La Loma" },
+                ]}
+                required
+              />
 
-              {/* Botones */}
-              <div className="flex justify-end gap-4.5">
+              <TextAreaInput
+                label="Observación"
+                value={formData.observacionPqr}
+                onChange={(e) => setFormData({ ...formData, observacionPqr: e.target.value })}
+                rows={6}
+                placeholder="Ingrese observación adicional"
+              />
+
+              {/* Botones finales */}
+              <div className="flex justify-end gap-6">
                 <button
                   type="button"
-                  onClick={handleCancel}
-                  className="rounded border border-stroke py-3 px-8 font-medium text-black hover:shadow-1 dark:border-strokedark dark:text-white"
+                  onClick={() => navigate("/pqrs")}
+                  className="rounded-lg border border-stroke py-3 px-10 font-medium text-black hover:shadow-1 dark:border-strokedark dark:text-white"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={pqrMutation.isPending || !cliente}
-                  className="rounded bg-brand-600 py-3 px-8 text-white font-medium hover:bg-opacity-90 disabled:opacity-70"
+                  className="rounded-lg bg-primary py-3 px-10 font-medium text-white hover:bg-opacity-90 disabled:opacity-70"
                 >
                   {pqrMutation.isPending ? "Creando..." : "Crear PQR"}
                 </button>
