@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { ChevronLeft, Eye, EyeOff } from "lucide-react";
-import Label from "../form/Label";
+import Label from "../form/input/Label";
 import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
 

@@ -5,7 +5,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import type { EventInput } from "@fullcalendar/core";
 import type { DateSelectArg, EventClickArg } from "@fullcalendar/core";
-import { Modal } from "../components/ui/modal";
+import { Modal } from "../components/ui/modal/Modal";
 import { useModal } from "../hooks/useModal";
 import PageMeta from "../components/common/PageMeta";
 

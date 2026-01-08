@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
 import { useAuthStore } from "@/store/authStore";
 import { Eye, EyeOff } from "lucide-react";
+import api from "@/lib/api";
 
 export default function SignIn() {
   const [email, setEmail] = useState("admin@ilumap.com");
@@ -20,7 +20,7 @@ export default function SignIn() {
     setError("");
 
     try {
-      const response = await axios.post("http://localhost:5000/api/auth/login", {
+      const response = await api.post("/auth/login", {
         email,
         password,
       });
