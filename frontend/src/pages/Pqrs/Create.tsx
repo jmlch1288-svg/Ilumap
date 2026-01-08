@@ -1,21 +1,22 @@
 import { FormModal } from "@/components/ui/modal";
-import Form from "@/components/form/Form";
-import InputGroup from "@/components/form/group-input/InputGroup";
 import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/input/Label";
 import TextArea from "@/components/form/input/TextArea";
 import Alert from "@/components/ui/alert/Alert";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useAuthStore } from "@/store/authStore";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Mail, Phone, User, BadgeCheck } from "lucide-react";
+import { Mail, Phone, User, BadgeCheck, Edit, Search, Plus } from "lucide-react";
+import Checkbox from "@/components/form/input/Checkbox";
+import Select from "@/components/form/input/Select";
+import Input from "@/components/form/input/Input";
 
 /* ------------------ INTERFACES ------------------ */
 interface Cliente {
@@ -87,8 +88,10 @@ export default function PqrCreate() {
   /* ------------------ STATE ------------------ */
   const [documentoQuery, setDocumentoQuery] = useState("");
   const [cliente, setCliente] = useState<Cliente | null>(null);
-  const [editCliente, setEditCliente] = useState(false);
+  const [showEditClienteModal, setShowEditClienteModal] = useState(false);
   const [showNewClientModal, setShowNewClientModal] = useState(false);
+
+  const [editedCliente, setEditedCliente] = useState<Cliente | null>(null);
 
   const [newCliente, setNewCliente] = useState({
     id: "",
@@ -100,7 +103,7 @@ export default function PqrCreate() {
 
   const [formData, setFormData] = useState({
     fechaPqr: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-    prioridad: "MEDIA" as "ALTA" | "MEDIA" | "BAJA",
+    prioridad: "MEDIA" as "ALTA" | "MEDIA" | "BAJA" | "CRITICA",
     medioReporte: "PERSONAL",
     tipoPqr: "PETICION",
     condicion: "",
@@ -118,6 +121,8 @@ export default function PqrCreate() {
   const [searchSerie, setSearchSerie] = useState("");
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [createdPqr, setCreatedPqr] = useState<any>(null);
+  const [clienteFound, setClienteFound] = useState(false);
+  const [clienteNotFound, setClienteNotFound] = useState(false);
 
   /* ------------------ QUERIES ------------------ */
   const { data: clientes = [], isLoading: loadingClientes } = useQuery<Cliente[]>({
@@ -151,7 +156,7 @@ export default function PqrCreate() {
   /* ------------------ MUTATIONS ------------------ */
   const createClienteMutation = useMutation({
     mutationFn: (payload: typeof newCliente) =>
-      axios.post("http://localhost:5000/api/pqr/clientes", payload, {
+      axios.post("http://localhost:5000/api/clientes", payload, {  // Cambiado a /api/clientes si /pqr da error; ajusta si no
         headers: { Authorization: `Bearer ${token}` },
       }),
     onSuccess: (res) => {
@@ -159,6 +164,21 @@ export default function PqrCreate() {
       setCliente(newClienteData);
       setShowNewClientModal(false);
       setNewCliente({ id: "", nombre: "", telefono: "", correo: "", observacion: "" });
+      setClienteFound(true);
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+    },
+  });
+
+  const updateClienteMutation = useMutation({
+    mutationFn: (payload: Cliente) =>
+      axios.put(`http://localhost:5000/api/clientes/${payload.id}`, payload, {  // Cambiado a /api/clientes
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    onSuccess: (res) => {
+      const updatedData = res.data;
+      setCliente(updatedData);
+      setShowEditClienteModal(false);
+      setClienteFound(true);
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
     },
   });
@@ -181,6 +201,30 @@ export default function PqrCreate() {
   });
 
   /* ------------------ HANDLERS ------------------ */
+  const handleDocumentoChange = (value: string) => {  // Cambiado a value directo si Input onChange(value)
+    setDocumentoQuery(value);
+    if (!value) {
+      setCliente(null);
+      setClienteFound(false);
+      setClienteNotFound(false);
+    } else {
+      setClienteNotFound(false);
+    }
+  };
+
+  const handleSelectCliente = (cl: Cliente) => {
+    setCliente(cl);
+    setClienteFound(true);
+    setClienteNotFound(false);
+  };
+
+  const handleOpenEditModal = () => {
+    if (cliente) {
+      setEditedCliente(cliente);
+      setShowEditClienteModal(true);
+    }
+  };
+
   const handleSelectSerie = (serie: string) => {
     const inv = inventarios.find((i: Inventario) => i.serie === serie);
     if (inv) {
@@ -197,13 +241,20 @@ export default function PqrCreate() {
     }
   };
 
-  const handleMapUpdate = (lat: number, lng: number, direccion: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      lat,
-      lng,
-      direccionPqr: direccion,
-    }));
+  const handleSerieChange = (value: string) => {
+    setSearchSerie(value);
+    if (!value) {
+      setFormData((prev) => ({
+        ...prev,
+        serieLuminaria: "",
+        direccionPqr: "",
+        sectorPqr: "CABECERA_MUNICIPAL",
+        barrio: "",
+        lat: 6.963,
+        lng: -75.417,
+      }));
+      setPosition([6.963, -75.417]);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -255,6 +306,26 @@ export default function PqrCreate() {
 
   const isLocationDisabled = formData.hasSerie && !!formData.serieLuminaria;
 
+  // Fix bug mapa resize mejorado
+  const MapResizer = () => {
+    const map = useMap();
+    useEffect(() => {
+      setTimeout(() => map.invalidateSize(), 100); // Inicial
+      const handleResize = () => map.invalidateSize();
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }, [map]);
+    return null;
+  };
+
+  useEffect(() => {
+    if (documentoQuery && clientes.length === 0 && !loadingClientes) {
+      setClienteNotFound(true);
+    } else {
+      setClienteNotFound(false);
+    }
+  }, [clientes, documentoQuery, loadingClientes]);
+
   /* ------------------ RENDER ------------------ */
   return (
     <>
@@ -270,10 +341,10 @@ export default function PqrCreate() {
               </h3>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6.5">
-              {/* Alert de éxito */}
+            <form onSubmit={handleSubmit} className="p-6.5 grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Alert de éxito global */}
               {showSuccessAlert && createdPqr && (
-                <div className="mb-6">
+                <div className="col-span-2 mb-6">
                   <Alert
                     variant="success"
                     title="¡PQR creada exitosamente!"
@@ -282,34 +353,41 @@ export default function PqrCreate() {
                 </div>
               )}
 
-              {/* Búsqueda de cliente */}
-              <div className="mb-6">
-                <label className="mb-2.5 block text-black dark:text-white">
-                  Cliente (documento) <span className="text-meta-1">*</span>
-                </label>
+              {/* Fecha primero, full width */}
+              <div className="col-span-2">
+                <Label>Fecha PQR <span className="text-meta-1">*</span></Label>
+                <Input
+                  type="datetime-local"
+                  value={formData.fechaPqr}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, fechaPqr: value }))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Sección Cliente, full width */}
+              <div className="col-span-2">
+                <Label>Cliente (documento) <span className="text-meta-1">*</span></Label>
                 <div className="relative">
-                  <input
+                  <Input
                     type="text"
                     placeholder="Buscar por documento..."
                     value={documentoQuery}
-                    onChange={(e) => setDocumentoQuery(e.target.value)}
-                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 pl-11 pr-4 text-black outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    onChange={handleDocumentoChange}
+                    className="w-full pl-10"
                   />
-                  <svg className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                 </div>
 
-                {clientes.length > 0 && (
-                  <div className="mt-4 space-y-2">
+                {clientes.length > 0 && !clienteFound && (
+                  <div className="mt-4 space-y-2 max-h-40 overflow-y-auto">
                     {clientes.map((cl) => (
                       <div
                         key={cl.id}
-                        onClick={() => setCliente(cl)}
-                        className="cursor-pointer rounded border border-stroke p-3 hover:bg-gray-50 dark:hover:bg-meta-4"
+                        onClick={() => handleSelectCliente(cl)}
+                        className="cursor-pointer rounded border border-stroke p-3 hover:bg-gray-50 dark:hover:bg-meta-4 dark:border-strokedark"
                       >
-                        <p className="font-medium">{cl.id} - {cl.nombre}</p>
-                        <p className="text-sm text-meta-5">
+                        <p className="font-medium text-black dark:text-white">{cl.id} - {cl.nombre}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
                           {cl.telefono || "Sin teléfono"} | {cl.correo || "Sin correo"}
                         </p>
                       </div>
@@ -317,315 +395,155 @@ export default function PqrCreate() {
                   </div>
                 )}
 
-                {documentoQuery && clientes.length === 0 && !loadingClientes && (
+                {clienteFound && cliente && (
                   <div className="mt-4">
-                    <p className="text-red-500 mb-3">Cliente no encontrado</p>
+                    <Alert variant="success" message="Cliente encontrado" className="mb-2" />
+                    <div className="flex flex-row flex-wrap gap-4 p-3 rounded border border-stroke dark:border-strokedark bg-gray-50 dark:bg-boxdark-2">
+                      <div className="flex items-center gap-2"><BadgeCheck size={16} /> ID: {cliente.id}</div>
+                      <div className="flex items-center gap-2"><User size={16} /> Nombre: {cliente.nombre}</div>
+                      <div className="flex items-center gap-2"><Phone size={16} /> Teléfono: {cliente.telefono || "N/A"}</div>
+                      <div className="flex items-center gap-2"><Mail size={16} /> Correo: {cliente.correo || "N/A"}</div>
+                    </div>
+                    <Button variant="outline" onClick={handleOpenEditModal} className="mt-2">
+                      <Edit size={16} className="mr-2" /> Editar información del cliente
+                    </Button>
+                  </div>
+                )}
+
+                {clienteNotFound && (
+                  <div className="mt-4">
+                    <p className="text-red-500 mb-3 font-medium">Cliente no encontrado, ¿desea agregar uno?</p>
                     <Button
+                      variant="outline"
                       onClick={() => {
                         setNewCliente((prev) => ({ ...prev, id: documentoQuery }));
                         setShowNewClientModal(true);
                       }}
+                      className="mt-2"
                     >
-                      Agregar nuevo cliente
+                      <Plus size={16} className="mr-2" /> Agregar nuevo cliente
                     </Button>
                   </div>
                 )}
               </div>
 
-              {/* Modal crear cliente */}
-              <FormModal
-                isOpen={showNewClientModal}
-                onClose={() => setShowNewClientModal(false)}
-                title="Crear Nuevo Cliente"
-                widthClass="md:max-w-4xl"
-                footer={
-                  <>
-                    <Button variant="outline" onClick={() => setShowNewClientModal(false)}>
-                      Cancelar
-                    </Button>
-                    <Button
-                      onClick={() => createClienteMutation.mutate(newCliente)}
-                      loading={createClienteMutation.isPending}
-                      disabled={!newCliente.id || !newCliente.nombre}
-                    >
-                      Guardar cliente
-                    </Button>
-                  </>
-                }
-              >
-                <Form onSubmit={() => createClienteMutation.mutate(newCliente)}>
-                  <InputGroup
-                    label="Documento *"
-                    placeholder="Número de identificación"
-                    icon={<BadgeCheck className="h-5 w-5" />}
-                    value={newCliente.id}
-                    onChange={(e) => setNewCliente((prev) => ({ ...prev, id: e.target.value }))}
-                    disabled
-                  />
-                  <InputGroup
-                    label="Nombre completo *"
-                    placeholder="Nombre del cliente"
-                    icon={<User className="h-5 w-5" />}
-                    value={newCliente.nombre}
-                    onChange={(e) => setNewCliente((prev) => ({ ...prev, nombre: e.target.value }))}
-                  />
-                  <InputGroup
-                    type="email"
-                    label="Correo electrónico"
-                    placeholder="correo@ejemplo.com"
-                    icon={<Mail className="h-5 w-5" />}
-                    value={newCliente.correo}
-                    onChange={(e) => setNewCliente((prev) => ({ ...prev, correo: e.target.value }))}
-                  />
-                  <InputGroup
-                    type="tel"
-                    label="Teléfono"
-                    placeholder="300 123 4567"
-                    icon={<Phone className="h-5 w-5" />}
-                    value={newCliente.telefono}
-                    onChange={(e) => setNewCliente((prev) => ({ ...prev, telefono: e.target.value }))}
-                  />
-                  <div>
-                    <Label htmlFor="observacion">Observación</Label>
-                    <TextArea
-                      id="observacion"
-                      placeholder="Observación adicional"
-                      value={newCliente.observacion}
-                      onChange={(e) => setNewCliente((prev) => ({ ...prev, observacion: e.target.value }))}
-                    />
-                  </div>
-                </Form>
-              </FormModal>
-
-              {/* Cliente seleccionado - edición */}
-              {cliente && (
-                <div className="mb-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <input
-                      type="checkbox"
-                      id="editCliente"
-                      checked={editCliente}
-                      onChange={(e) => setEditCliente(e.target.checked)}
-                      className="h-5 w-5 rounded border-stroke dark:border-strokedark"
-                    />
-                    <label htmlFor="editCliente" className="text-black dark:text-white">
-                      Editar información del cliente
-                    </label>
-                  </div>
-                  {/* Campos de cliente (simplificados, puedes agregar mutation de update si lo deseas) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" disabled value={cliente.id} className="input-disabled" />
-                    <input type="text" disabled={!editCliente} value={cliente.nombre} onChange={(e) => setCliente((prev) => prev ? {...prev, nombre: e.target.value} : null)} className="input-base" />
-                    <input type="tel" disabled={!editCliente} value={cliente.telefono} onChange={(e) => setCliente((prev) => prev ? {...prev, telefono: e.target.value} : null)} className="input-base" />
-                    <input type="email" disabled={!editCliente} value={cliente.correo} onChange={(e) => setCliente((prev) => prev ? {...prev, correo: e.target.value} : null)} className="input-base" />
-                  </div>
-                  <textarea disabled={!editCliente} value={cliente.observacion} onChange={(e) => setCliente((prev) => prev ? {...prev, observacion: e.target.value} : null)} className="w-full mt-4 textarea-base" />
-                </div>
-              )}
-
-              {/* Resto del formulario (campos PQR) */}
-              {/* Fecha y Prioridad */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5 mb-6">
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Fecha de PQR <span className="text-meta-1">*</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={formData.fechaPqr}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, fechaPqr: e.target.value }))}
-                    className="w-full input-base"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Prioridad <span className="text-meta-1">*</span>
-                  </label>
-                  <select
-                    required
-                    value={formData.prioridad}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, prioridad: e.target.value as any }))}
-                    className="w-full input-base"
-                  >
-                    <option value="ALTA">Alta</option>
-                    <option value="MEDIA">Media</option>
-                    <option value="BAJA">Baja</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Medio, Tipo y Condición */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5 mb-6">
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Medio de reporte <span className="text-meta-1">*</span>
-                  </label>
-                  <select
-                    required
-                    value={formData.medioReporte}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, medioReporte: e.target.value }))}
-                    className="w-full input-base"
-                  >
-                    <option value="PERSONAL">Personal</option>
-                    <option value="TELEFONICO">Telefónico</option>
-                    <option value="ESCRITO">Escrito</option>
-                    <option value="CORREO_ELECTRONICO">Correo Electrónico</option>
-                    <option value="WHATSAPP">Whatsapp</option>
-                    <option value="AUTONOMO">Autónomo</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Tipo de PQR <span className="text-meta-1">*</span>
-                  </label>
-                  <select
-                    required
-                    value={formData.tipoPqr}
-                    onChange={(e) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        tipoPqr: e.target.value,
-                        condicion: "",
-                      }));
-                    }}
-                    className="w-full input-base"
-                  >
-                    <option value="PETICION">Petición</option>
-                    <option value="QUEJA">Queja</option>
-                    <option value="RECLAMO">Reclamo</option>
-                    <option value="REPORTE">Reporte</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Condición <span className="text-meta-1">*</span>
-                  </label>
-                  <select
-                    required
-                    value={formData.condicion}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, condicion: e.target.value }))}
-                    className="w-full input-base"
-                  >
-                    <option value="">Selecciona condición</option>
-                    {getCondiciones().map((cond) => (
-                      <option key={cond} value={cond}>
-                        {formatConditionLabel(cond)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Sector */}
-              <div className="mb-6">
-                <label className="mb-2.5 block text-black dark:text-white">
-                  Sector <span className="text-meta-1">*</span>
-                </label>
-                <select
-                  required
-                  value={formData.sectorPqr}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, sectorPqr: e.target.value }))}
-                  disabled={isLocationDisabled}
-                  className="w-full input-base disabled:opacity-70"
-                >
-                  <option value="CABECERA_MUNICIPAL">Cabecera Municipal</option>
-                  <option value="OCHALI">Ochalí</option>
-                  <option value="EL_PUEBLITO">El Pueblito</option>
-                  <option value="EL_CEDRO">El Cedro</option>
-                  <option value="CEDENO">Cedeño</option>
-                  <option value="LLANOS_DE_CUIVA">Llanos de Cuiva</option>
-                  <option value="LA_LOMA">La Loma</option>
-                </select>
-              </div>
-
-              {/* Checkbox serie */}
-              <div className="mb-6 flex items-center gap-4">
-                <input
-                  type="checkbox"
-                  id="hasSerie"
-                  checked={formData.hasSerie}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, hasSerie: e.target.checked }))}
-                  className="h-5 w-5 rounded border-stroke dark:border-strokedark"
+              {/* Prioridad y Medio de Reporte en una línea */}
+              <div className="col-span-1">
+                <Label>Prioridad <span className="text-meta-1">*</span></Label>
+                <Select
+                  value={formData.prioridad}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, prioridad: value }))}
+                  options={[{ value: "BAJA", label: "Baja" }, { value: "MEDIA", label: "Media" }, { value: "ALTA", label: "Alta" }, { value: "CRITICA", label: "Crítica" }]}
                 />
-                <label htmlFor="hasSerie" className="text-black dark:text-white">
+              </div>
+              <div className="col-span-1">
+                <Label>Medio de Reporte <span className="text-meta-1">*</span></Label>
+                <Select
+                  value={formData.medioReporte}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, medioReporte: value }))}
+                  options={[{ value: "PERSONAL", label: "Personal" }, { value: "TELEFONICO", label: "Telefónico" }, { value: "EMAIL", label: "Email" }, { value: "APP", label: "App" }]}
+                />
+              </div>
+
+              {/* Tipo PQR y Condición en una línea */}
+              <div className="col-span-1">
+                <Label>Tipo PQR <span className="text-meta-1">*</span></Label>
+                <Select
+                  value={formData.tipoPqr}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, tipoPqr: value, condicion: "" }))}
+                  options={[{ value: "PETICION", label: "Petición" }, { value: "QUEJA", label: "Queja" }, { value: "RECLAMO", label: "Reclamo" }, { value: "REPORTE", label: "Reporte" }]}
+                />
+              </div>
+              <div className="col-span-1">
+                <Label>Condición <span className="text-meta-1">*</span></Label>
+                <Select
+                  value={formData.condicion}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, condicion: value }))}
+                  options={getCondiciones().map((cond) => ({ value: cond, label: formatConditionLabel(cond) }))}
+                />
+              </div>
+
+              {/* Checkbox full width */}
+              <div className="col-span-2">
+                <Checkbox
+                  checked={formData.hasSerie}
+                  onChange={(checked) => setFormData((prev) => ({ ...prev, hasSerie: checked }))}
+                >
                   ¿Tiene serie de luminaria?
-                </label>
+                </Checkbox>
+
+                {formData.hasSerie && (
+                  <div className="mt-4">
+                    <Label>Número de Serie</Label>
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        placeholder="Buscar serie de luminaria..."
+                        value={searchSerie}
+                        onChange={handleSerieChange}
+                        className="w-full pl-10"
+                      />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                    </div>
+
+                    {filteredSeries.length > 0 && (
+                      <div className="mt-4 space-y-2 max-h-40 overflow-y-auto">
+                        {filteredSeries.map((inv) => (
+                          <div
+                            key={inv.serie}
+                            onClick={() => handleSelectSerie(inv.serie)}
+                            className="cursor-pointer rounded border border-stroke p-3 hover:bg-gray-50 dark:hover:bg-meta-4 dark:border-strokedark"
+                          >
+                            <p className="font-medium text-black dark:text-white">{inv.serie} - {inv.direccion}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              Sector: {inv.sector} | Barrio: {inv.barrio}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Búsqueda y selección de serie */}
-              {formData.hasSerie && (
-                <div className="mb-6">
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Serie de luminaria <span className="text-meta-1">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Buscar serie..."
-                    value={searchSerie}
-                    onChange={(e) => setSearchSerie(e.target.value)}
-                    className="w-full input-base mb-3"
-                  />
-                  <select
-                    required
-                    value={formData.serieLuminaria}
-                    onChange={(e) => handleSelectSerie(e.target.value)}
-                    className="w-full input-base"
-                  >
-                    <option value="">Selecciona una serie</option>
-                    {filteredSeries.map((inv) => (
-                      <option key={inv.serie} value={inv.serie}>
-                        {inv.serie} - {inv.direccion}
-                      </option>
-                    ))}
-                  </select>
-                  {searchSerie && filteredSeries.length === 0 && (
-                    <p className="text-red-500 mt-2">Serie no encontrada</p>
-                  )}
-                </div>
-              )}
-
-              {/* Dirección y Barrio */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5 mb-6">
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">
-                    Dirección <span className="text-meta-1">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.direccionPqr}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, direccionPqr: e.target.value }))}
-                    disabled={isLocationDisabled}
-                    className="w-full input-base disabled:opacity-70"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2.5 block text-black dark:text-white">Barrio</label>
-                  <input
-                    type="text"
-                    value={formData.barrio}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, barrio: e.target.value }))}
-                    disabled={isLocationDisabled}
-                    className="w-full input-base disabled:opacity-70"
-                  />
-                </div>
+              {/* Sector y Barrio en una línea */}
+              <div className="col-span-1">
+                <Label>Sector <span className="text-meta-1">*</span></Label>
+                <Select
+                  value={formData.sectorPqr}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, sectorPqr: value }))}
+                  options={[{ value: "CABECERA_MUNICIPAL", label: "Cabecera Municipal" } /* agrega más */ ]}
+                  disabled={isLocationDisabled}
+                />
+              </div>
+              <div className="col-span-1">
+                <Label>Barrio</Label>
+                <Input
+                  type="text"
+                  value={formData.barrio}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, barrio: value }))}
+                  disabled={isLocationDisabled}
+                  className="w-full"
+                />
               </div>
 
-              {/* Mapa restringido a Yarumal */}
-              <div className="mb-6">
-                <label className="mb-2.5 block text-black dark:text-white">
-                  Ubicación (click para seleccionar)
-                </label>
-                <div className="h-96 rounded-lg overflow-hidden border border-stroke dark:border-strokedark">
-                  <MapContainer
-                    center={position}
-                    zoom={13}
-                    minZoom={11}
-                    maxBounds={[[6.80, -75.60], [7.15, -75.25]]}
-                    maxBoundsViscosity={1.0}
-                    style={{ height: "100%", width: "100%" }}
-                  >
+              {/* Dirección full width */}
+              <div className="col-span-2">
+                <Label>Dirección <span className="text-meta-1">*</span></Label>
+                <Input
+                  type="text"
+                  value={formData.direccionPqr}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, direccionPqr: value }))}
+                  disabled={isLocationDisabled}
+                  className="w-full mb-4"
+                />
+              </div>
+
+              {/* Mapa full width */}
+              <div className="col-span-2">
+                <Label>Ubicación Geográfica</Label>
+                <div className="h-64 w-full rounded border border-stroke dark:border-strokedark overflow-hidden">
+                  <MapContainer center={position} zoom={13} style={{ height: "100%", width: "100%" }}>
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                     <LocationMarker
                       position={position}
@@ -634,45 +552,150 @@ export default function PqrCreate() {
                       setLatLng={(lat, lng) => setFormData((prev) => ({ ...prev, lat, lng }))}
                       disabled={isLocationDisabled}
                     />
+                    <MapResizer />
                   </MapContainer>
                 </div>
-                <p className="mt-2 text-sm text-meta-5">
-                  Dirección detectada: {formData.direccionPqr || "Haz click en el mapa para obtenerla"}
-                </p>
               </div>
 
-              {/* Observación PQR */}
-              <div className="mb-6">
-                <label className="mb-2.5 block text-black dark:text-white">Observación</label>
-                <textarea
-                  rows={6}
+              {/* Observación full width */}
+              <div className="col-span-2">
+                <Label>Observación</Label>
+                <TextArea
                   value={formData.observacionPqr}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, observacionPqr: e.target.value }))}
-                  className="w-full textarea-base"
+                  onChange={(value) => setFormData((prev) => ({ ...prev, observacionPqr: value }))}
+                  className="w-full"
                 />
               </div>
 
-              {/* Botones de acción */}
-              <div className="flex justify-end gap-4.5">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="rounded border border-stroke py-3 px-8 font-medium text-black hover:shadow-1 dark:border-strokedark dark:text-white"
-                >
+              {/* Botones */}
+              <div className="col-span-2 flex justify-end gap-4">
+                <Button variant="outline" onClick={handleCancel}>
                   Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={pqrMutation.isPending || !cliente || !formData.condicion}
-                  className="rounded bg-brand-600 py-3 px-8 text-white font-medium hover:bg-opacity-90 disabled:opacity-70"
-                >
-                  {pqrMutation.isPending ? "Creando..." : "Crear PQR"}
-                </button>
+                </Button>
+                <Button type="submit" loading={pqrMutation.isPending}>
+                  Guardar PQR
+                </Button>
               </div>
             </form>
           </div>
         </div>
       </div>
+
+      {/* Modal Crear Nuevo Cliente */}
+      <FormModal
+        isOpen={showNewClientModal}
+        onClose={() => setShowNewClientModal(false)}
+        title="Crear Nuevo Cliente"
+        widthClass="md:max-w-4xl"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setShowNewClientModal(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => createClienteMutation.mutate(newCliente)}
+              loading={createClienteMutation.isPending}
+              disabled={!newCliente.id || !newCliente.nombre}
+            >
+              Guardar cliente
+            </Button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <Label>ID (Documento)</Label>
+            <div className="relative">
+              <Input value={newCliente.id} onChange={(value) => setNewCliente((prev) => ({ ...prev, id: value }))} className="pl-10" />
+              <BadgeCheck className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+            </div>
+          </div>
+          <div>
+            <Label>Nombre</Label>
+            <div className="relative">
+              <Input value={newCliente.nombre} onChange={(value) => setNewCliente((prev) => ({ ...prev, nombre: value }))} className="pl-10" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+            </div>
+          </div>
+          <div>
+            <Label>Teléfono</Label>
+            <div className="relative">
+              <Input value={newCliente.telefono} onChange={(value) => setNewCliente((prev) => ({ ...prev, telefono: value }))} className="pl-10" />
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+            </div>
+          </div>
+          <div>
+            <Label>Correo</Label>
+            <div className="relative">
+              <Input value={newCliente.correo} onChange={(value) => setNewCliente((prev) => ({ ...prev, correo: value }))} className="pl-10" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+            </div>
+          </div>
+          <div className="col-span-2">
+            <Label>Observación</Label>
+            <TextArea value={newCliente.observacion} onChange={(value) => setNewCliente((prev) => ({ ...prev, observacion: value }))} />
+          </div>
+        </div>
+      </FormModal>
+
+      {/* Modal Editar Cliente */}
+      <FormModal
+        isOpen={showEditClienteModal}
+        onClose={() => setShowEditClienteModal(false)}
+        title="Editar Cliente"
+        widthClass="md:max-w-4xl"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setShowEditClienteModal(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => editedCliente && updateClienteMutation.mutate(editedCliente)}
+              loading={updateClienteMutation.isPending}
+              disabled={!editedCliente?.id || !editedCliente?.nombre}
+            >
+              Guardar cambios
+            </Button>
+          </>
+        }
+      >
+        {editedCliente && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label>ID (Documento)</Label>
+              <div className="relative">
+                <Input value={editedCliente.id} disabled className="pl-10" />
+                <BadgeCheck className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+              </div>
+            </div>
+            <div>
+              <Label>Nombre</Label>
+              <div className="relative">
+                <Input value={editedCliente.nombre} onChange={(value) => setEditedCliente((prev) => prev ? ({ ...prev, nombre: value }) : null)} className="pl-10" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+              </div>
+            </div>
+            <div>
+              <Label>Teléfono</Label>
+              <div className="relative">
+                <Input value={editedCliente.telefono} onChange={(value) => setEditedCliente((prev) => prev ? ({ ...prev, telefono: value }) : null)} className="pl-10" />
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+              </div>
+            </div>
+            <div>
+              <Label>Correo</Label>
+              <div className="relative">
+                <Input value={editedCliente.correo} onChange={(value) => setEditedCliente((prev) => prev ? ({ ...prev, correo: value }) : null)} className="pl-10" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+              </div>
+            </div>
+            <div className="col-span-2">
+              <Label>Observación</Label>
+              <TextArea value={editedCliente.observacion} onChange={(value) => setEditedCliente((prev) => prev ? ({ ...prev, observacion: value }) : null)} />
+            </div>
+          </div>
+        )}
+      </FormModal>
     </>
   );
 }
