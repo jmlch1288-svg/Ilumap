@@ -27,91 +27,16 @@ enum MedioReporte {
   AUTONOMO
 }
 
-enum condicion {
+enum Condicion {
   APAGADA
   ENCENDIDA_24H
   INTERMITENTE
-  POCA_ILUMINACIÓN
-}
-
-enum TipoPqr {
-  PETICION
-  QUEJA
-  RECLAMO
-  REPORTE
-}
-
-enum EstadoPqr {
-  PENDIENTE
-  EN_PROCESO
-  PROCESADA
-}
-
-enum SectorPqr {
-  CABECERA_MUNICIPAL
-  OCHALI
-  EL_PUEBLITO
-  EL_CEDRO
-  CEDENO
-  LLANOS_DE_CUIVA
-  LA_LOMA
-}
-
-¡FELICIDADES ABSOLUTAS! 🎉🎉💡🔥✨
-¡LO LOGRAMOS AL 100%!
-Aquí tienes todo el código completo que solicitaste, listo para copiar y pegar:
-1. backend/prisma/schema.prisma – Enums y campo condición obligatorio
-prismagenerator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-enum Role {
-  ADMIN
-  TECHNICIAN
-  OPERATOR
-  VIEWER
-}
-
-enum medioReporte {
-  PERSONAL
-  TELEFONICO
-  ESCRITO
-  CORREO_ELECTRONICO
-  WHATSAPP
-  AUTONOMO
-}
-
-enum tipoPqr {
-  PETICION
-  QUEJA
-  RECLAMO
-  REPORTE
-}
-
-enum sectorPqr {
-  CABECERA_MUNICIPAL
-  OCHALI
-  EL_PUEBLITO
-  EL_CEDRO
-  CEDENO
-  LLANOS_DE_CUIVA
-  LA_LOMA
-}
-
-enum condicion {
-  APAGADA
-  ENCENDIDA_24H
-  INTERMITENTE
+  POCA_ILUMINACION
   BAJA_INTENSIDAD
   PARPADEO
   FALLA_ELECTRICA
   FALLA_FOTOCONTROL
-  LUMINARIA_DAÑADA
+  LUMINARIA_DANADA
   LUMINARIA_CAIDA
   POSTE_INCLINADO
   POSTE_CAIDO
@@ -136,7 +61,28 @@ enum condicion {
   SERVICIO_AP
 }
 
+enum TipoPqr {
+  PETICION
+  QUEJA
+  RECLAMO
+  REPORTE
+}
 
+enum EstadoPqr {
+  PENDIENTE
+  EN_PROCESO
+  PROCESADA
+}
+
+enum SectorPqr {
+  CABECERA_MUNICIPAL
+  OCHALI
+  EL_PUEBLITO
+  EL_CEDRO
+  CEDENO
+  LLANOS_DE_CUIVA
+  LA_LOMA
+}
 
 enum PrioridadPqr {
   BAJA
@@ -227,11 +173,11 @@ model User {
   @@map("users")
 }
 
-// Tabla Cliente (nueva)
+// Tabla Cliente
 model Cliente {
   id          String   @id // Documento de identidad
   nombre      String
-  telefono   String?
+  telefono    String?
   correo      String?
   observacion String?
 
@@ -248,14 +194,14 @@ model Cliente {
 //////////////////
 
 model Pqr {
-  id                    String    @id @default(uuid())
+  id                    String       @id @default(uuid())
   prioridad             PrioridadPqr @default(BAJA)
-  fechaPqr              DateTime  @default(now())
+  fechaPqr              DateTime     @default(now())
   clienteId             String
   medioReporte          MedioReporte
   tipoPqr               TipoPqr
-  condicion             String?
-  hasSerie              Boolean   @default(false)
+  condicion             Condicion?
+  hasSerie              Boolean      @default(false)
   serieLuminaria        String?
   direccionPqr          String
   sectorPqr             String?
@@ -263,17 +209,17 @@ model Pqr {
   lat                   Float?
   lng                   Float?
   observacionPqr        String?
-  estado                EstadoPqr @default(PENDIENTE)
+  estado                EstadoPqr    @default(PENDIENTE)
   plazoDias             Int
   fechaPlazo            DateTime?
   responsableAtencionId String?
   usuarioCreadorId      String
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
-  usuarioCreador        User      @relation("PqrCreador", fields: [usuarioCreadorId], references: [id])
-  cliente               Cliente   @relation(fields: [clienteId], references: [id])
-  luminaria             Inventario? @relation(fields: [serieLuminaria], references: [serie])
+  usuarioCreador        User         @relation("PqrCreador", fields: [usuarioCreadorId], references: [id])
+  cliente               Cliente      @relation(fields: [clienteId], references: [id])
+  luminaria             Inventario?  @relation(fields: [serieLuminaria], references: [serie])
   historial             PqrHistorial[]
 
   @@map("pqrs")
@@ -328,10 +274,9 @@ model Inventario {
   caracteristicaId Int? @unique
   caracteristica   CaracteristicaLuminaria? @relation(fields: [caracteristicaId], references: [id])
 
-
   pqrs        Pqr[]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([serie])
   @@index([barrio])

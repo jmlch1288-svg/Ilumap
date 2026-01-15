@@ -1,26 +1,15 @@
-import Input from "../input/InputField";
-import Label from "../input/Label";
+import { ReactNode } from "react";
 
 interface InputGroupProps {
   label?: string;
-  icon?: React.ReactNode;
-  placeholder?: string;
-  type?: React.HTMLInputTypeAttribute;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  icon?: ReactNode;
+  children: ReactNode;   // 👈 AÑADIDO
 }
 
-export default function InputGroup({
-  label,
-  icon,
-  type = "text",
-  value,
-  onChange,
-  placeholder,
-}: InputGroupProps) {
+export default function InputGroup({ label, icon, children }: InputGroupProps) {
   return (
     <div className="space-y-1">
-      {label && <Label>{label}</Label>}
+      {label && <label className="text-sm font-medium">{label}</label>}
 
       <div className="relative">
         {icon && (
@@ -29,15 +18,10 @@ export default function InputGroup({
           </span>
         )}
 
-        <Input
-          type={type}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          className={icon ? "pl-12" : ""}
-        />
+        <div className={icon ? "pl-12" : ""}>{children}</div>
       </div>
     </div>
   );
 }
+
 

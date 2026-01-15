@@ -3,6 +3,8 @@ import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/input/Label";
 import TextArea from "@/components/form/input/TextArea";
 import Alert from "@/components/ui/alert/Alert";
+import InputGroup from "@/components/form/group-input/InputGroup";
+import Switch from "@/components/form/switch/Switch";
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -13,10 +15,17 @@ import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Mail, Phone, User, BadgeCheck, Edit, Search, Plus } from "lucide-react";
-import Checkbox from "@/components/form/input/Checkbox";
-import Select from "@/components/form/input/Select";
-import Input from "@/components/form/input/Input";
+import Flatpickr from "react-flatpickr";
+import "flatpickr/dist/flatpickr.css";
+import {
+  Mail,
+  Phone,
+  User,
+  BadgeCheck,
+  Edit,
+  Search,
+  Plus,
+} from "lucide-react";
 
 /* ------------------ INTERFACES ------------------ */
 interface Cliente {
@@ -45,7 +54,7 @@ const formatConditionLabel = (value: string): string => {
     .join(" ");
 };
 
-/* ------------------ MAP COMPONENT ------------------ */
+/* ------------------ MAP COMPONENTS ------------------ */
 function LocationMarker({
   position,
   setPosition,
@@ -79,18 +88,31 @@ function LocationMarker({
   return <Marker position={position} />;
 }
 
+function MapResizer({ position, hasSerie }: { position: [number, number]; hasSerie: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    const resizeObserver = new ResizeObserver(() => map.invalidateSize());
+    resizeObserver.observe(document.body);
+    return () => resizeObserver.disconnect();
+  }, [map]);
+
+  useEffect(() => {
+    map.invalidateSize();
+  }, [map, position, hasSerie]);
+
+  return null;
+}
+
 /* ------------------ MAIN COMPONENT ------------------ */
 export default function PqrCreate() {
   const { token } = useAuthStore();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  /* ------------------ STATE ------------------ */
   const [documentoQuery, setDocumentoQuery] = useState("");
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [showEditClienteModal, setShowEditClienteModal] = useState(false);
   const [showNewClientModal, setShowNewClientModal] = useState(false);
-
   const [editedCliente, setEditedCliente] = useState<Cliente | null>(null);
 
   const [newCliente, setNewCliente] = useState({
@@ -120,14 +142,13 @@ export default function PqrCreate() {
   const [position, setPosition] = useState<[number, number]>([formData.lat, formData.lng]);
   const [searchSerie, setSearchSerie] = useState("");
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
-  const [createdPqr, setCreatedPqr] = useState<any>(null);
   const [clienteFound, setClienteFound] = useState(false);
   const [clienteNotFound, setClienteNotFound] = useState(false);
 
   /* ------------------ QUERIES ------------------ */
-  const { data: clientes = [], isLoading: loadingClientes } = useQuery<Cliente[]>({
+  const { data: clientes = [] } = useQuery<Cliente[]>({
     queryKey: ["clientes", documentoQuery],
-    queryFn: async () => {
+    queryFn: async (): Promise<Cliente[]> => {
       if (!documentoQuery.trim()) return [];
       const { data } = await axios.get(
         `http://localhost:5000/api/pqr/clientes/search?q=${documentoQuery}`,
@@ -138,9 +159,17 @@ export default function PqrCreate() {
     enabled: !!documentoQuery.trim(),
   });
 
+  useEffect(() => {
+    if (documentoQuery.trim() && clientes.length === 0) {
+      setClienteNotFound(true);
+    } else {
+      setClienteNotFound(false);
+    }
+  }, [clientes, documentoQuery]);
+
   const { data: inventarios = [] } = useQuery<Inventario[]>({
     queryKey: ["inventario"],
-    queryFn: async () => {
+    queryFn: async (): Promise<Inventario[]> => {
       const { data } = await axios.get("http://localhost:5000/api/pqr/inventario", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -154,13 +183,12 @@ export default function PqrCreate() {
   );
 
   /* ------------------ MUTATIONS ------------------ */
-  const createClienteMutation = useMutation({
-    mutationFn: (payload: typeof newCliente) =>
-      axios.post("http://localhost:5000/api/clientes", payload, {  // Cambiado a /api/clientes si /pqr da error; ajusta si no
+  const createClienteMutation = useMutation<Cliente, Error, typeof newCliente>({
+    mutationFn: (payload) =>
+      axios.post("http://localhost:5000/api/pqr/clientes", payload, {
         headers: { Authorization: `Bearer ${token}` },
-      }),
-    onSuccess: (res) => {
-      const newClienteData = res.data;
+      }).then((res) => res.data),
+    onSuccess: (newClienteData) => {
       setCliente(newClienteData);
       setShowNewClientModal(false);
       setNewCliente({ id: "", nombre: "", telefono: "", correo: "", observacion: "" });
@@ -169,49 +197,35 @@ export default function PqrCreate() {
     },
   });
 
-  const updateClienteMutation = useMutation({
-    mutationFn: (payload: Cliente) =>
-      axios.put(`http://localhost:5000/api/clientes/${payload.id}`, payload, {  // Cambiado a /api/clientes
+  const updateClienteMutation = useMutation<Cliente, Error, Cliente>({
+    mutationFn: (payload) =>
+      axios.put(`http://localhost:5000/api/pqr/clientes/${payload.id}`, payload, {
         headers: { Authorization: `Bearer ${token}` },
-      }),
-    onSuccess: (res) => {
-      const updatedData = res.data;
-      setCliente(updatedData);
+      }).then((res) => res.data),
+    onSuccess: (updatedCliente) => {
+      setCliente(updatedCliente);
       setShowEditClienteModal(false);
       setClienteFound(true);
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
     },
   });
 
-  const pqrMutation = useMutation({
-    mutationFn: (payload: any) =>
+  const pqrMutation = useMutation<void, Error, any>({
+    mutationFn: (payload) =>
       axios.post("http://localhost:5000/api/pqr", payload, {
         headers: { Authorization: `Bearer ${token}` },
       }),
-    onSuccess: (res) => {
-      const data = res.data;
-      setCreatedPqr(data);
+    onSuccess: () => {
       setShowSuccessAlert(true);
       queryClient.invalidateQueries({ queryKey: ["pqrs"] });
       setTimeout(() => {
         setShowSuccessAlert(false);
         navigate("/pqrs");
-      }, 6000);
+      }, 3000);
     },
   });
 
   /* ------------------ HANDLERS ------------------ */
-  const handleDocumentoChange = (value: string) => {  // Cambiado a value directo si Input onChange(value)
-    setDocumentoQuery(value);
-    if (!value) {
-      setCliente(null);
-      setClienteFound(false);
-      setClienteNotFound(false);
-    } else {
-      setClienteNotFound(false);
-    }
-  };
-
   const handleSelectCliente = (cl: Cliente) => {
     setCliente(cl);
     setClienteFound(true);
@@ -220,9 +234,14 @@ export default function PqrCreate() {
 
   const handleOpenEditModal = () => {
     if (cliente) {
-      setEditedCliente(cliente);
+      setEditedCliente({ ...cliente });
       setShowEditClienteModal(true);
     }
+  };
+
+  const handleOpenNewClientModal = () => {
+    setNewCliente((prev) => ({ ...prev, id: documentoQuery.trim() }));
+    setShowNewClientModal(true);
   };
 
   const handleSelectSerie = (serie: string) => {
@@ -241,22 +260,6 @@ export default function PqrCreate() {
     }
   };
 
-  const handleSerieChange = (value: string) => {
-    setSearchSerie(value);
-    if (!value) {
-      setFormData((prev) => ({
-        ...prev,
-        serieLuminaria: "",
-        direccionPqr: "",
-        sectorPqr: "CABECERA_MUNICIPAL",
-        barrio: "",
-        lat: 6.963,
-        lng: -75.417,
-      }));
-      setPosition([6.963, -75.417]);
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!cliente) return alert("Debes seleccionar o crear un cliente");
@@ -268,12 +271,6 @@ export default function PqrCreate() {
     };
 
     pqrMutation.mutate(payload);
-  };
-
-  const handleCancel = () => {
-    if (window.confirm("¿Deseas cancelar la creación de la PQR?")) {
-      navigate("/pqrs");
-    }
   };
 
   const getCondiciones = () => {
@@ -306,27 +303,6 @@ export default function PqrCreate() {
 
   const isLocationDisabled = formData.hasSerie && !!formData.serieLuminaria;
 
-  // Fix bug mapa resize mejorado
-  const MapResizer = () => {
-    const map = useMap();
-    useEffect(() => {
-      setTimeout(() => map.invalidateSize(), 100); // Inicial
-      const handleResize = () => map.invalidateSize();
-      window.addEventListener("resize", handleResize);
-      return () => window.removeEventListener("resize", handleResize);
-    }, [map]);
-    return null;
-  };
-
-  useEffect(() => {
-    if (documentoQuery && clientes.length === 0 && !loadingClientes) {
-      setClienteNotFound(true);
-    } else {
-      setClienteNotFound(false);
-    }
-  }, [clientes, documentoQuery, loadingClientes]);
-
-  /* ------------------ RENDER ------------------ */
   return (
     <>
       <PageMeta title="Crear PQR | ILUMAP" description="Crear nueva PQR" />
@@ -342,51 +318,55 @@ export default function PqrCreate() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6.5 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Alert de éxito global */}
-              {showSuccessAlert && createdPqr && (
+              {showSuccessAlert && (
                 <div className="col-span-2 mb-6">
                   <Alert
                     variant="success"
-                    title="¡PQR creada exitosamente!"
-                    message={`Estado: ${createdPqr.estado || "PENDIENTE"}. Plazo de atención: ${createdPqr.plazoDias} días.`}
+                    title="PQR creada con éxito"
+                    message="La PQR ha sido registrada correctamente. Serás redirigido al listado."
                   />
                 </div>
               )}
 
-              {/* Fecha primero, full width */}
+              {/* Fecha PQR */}
               <div className="col-span-2">
                 <Label>Fecha PQR <span className="text-meta-1">*</span></Label>
-                <Input
-                  type="datetime-local"
+                <Flatpickr
                   value={formData.fechaPqr}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, fechaPqr: value }))}
-                  className="w-full"
+                  onChange={([date]) => setFormData((prev) => ({ ...prev, fechaPqr: format(date, "yyyy-MM-dd'T'HH:mm") }))}
+                  options={{
+                    enableTime: true,
+                    dateFormat: "Y-m-d H:i",
+                    time_24hr: true,
+                  }}
+                  className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  required
                 />
               </div>
 
-              {/* Sección Cliente, full width */}
+              {/* Cliente */}
               <div className="col-span-2">
                 <Label>Cliente (documento) <span className="text-meta-1">*</span></Label>
                 <div className="relative">
-                  <Input
+                  <input
                     type="text"
                     placeholder="Buscar por documento..."
                     value={documentoQuery}
-                    onChange={handleDocumentoChange}
-                    className="w-full pl-10"
+                    onChange={(e) => setDocumentoQuery(e.target.value)}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent pl-10 pr-5 py-3 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
                   />
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                 </div>
 
                 {clientes.length > 0 && !clienteFound && (
-                  <div className="mt-4 space-y-2 max-h-40 overflow-y-auto">
+                  <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
                     {clientes.map((cl) => (
                       <div
                         key={cl.id}
                         onClick={() => handleSelectCliente(cl)}
-                        className="cursor-pointer rounded border border-stroke p-3 hover:bg-gray-50 dark:hover:bg-meta-4 dark:border-strokedark"
+                        className="cursor-pointer rounded border border-stroke p-4 hover:bg-gray-50 dark:hover:bg-meta-4 dark:border-strokedark"
                       >
-                        <p className="font-medium text-black dark:text-white">{cl.id} - {cl.nombre}</p>
+                        <p className="font-medium">{cl.id} - {cl.nombre}</p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           {cl.telefono || "Sin teléfono"} | {cl.correo || "Sin correo"}
                         </p>
@@ -397,14 +377,14 @@ export default function PqrCreate() {
 
                 {clienteFound && cliente && (
                   <div className="mt-4">
-                    <Alert variant="success" message="Cliente encontrado" className="mb-2" />
-                    <div className="flex flex-row flex-wrap gap-4 p-3 rounded border border-stroke dark:border-strokedark bg-gray-50 dark:bg-boxdark-2">
+                    <Alert variant="success" message="Cliente encontrado" className="mb-3" />
+                    <div className="flex flex-wrap gap-6 p-4 rounded border border-stroke bg-gray-50 dark:bg-boxdark-2 dark:border-strokedark">
                       <div className="flex items-center gap-2"><BadgeCheck size={16} /> ID: {cliente.id}</div>
                       <div className="flex items-center gap-2"><User size={16} /> Nombre: {cliente.nombre}</div>
                       <div className="flex items-center gap-2"><Phone size={16} /> Teléfono: {cliente.telefono || "N/A"}</div>
                       <div className="flex items-center gap-2"><Mail size={16} /> Correo: {cliente.correo || "N/A"}</div>
                     </div>
-                    <Button variant="outline" onClick={handleOpenEditModal} className="mt-2">
+                    <Button variant="secondary" onClick={handleOpenEditModal} className="mt-3">
                       <Edit size={16} className="mr-2" /> Editar información del cliente
                     </Button>
                   </div>
@@ -412,92 +392,110 @@ export default function PqrCreate() {
 
                 {clienteNotFound && (
                   <div className="mt-4">
-                    <p className="text-red-500 mb-3 font-medium">Cliente no encontrado, ¿desea agregar uno?</p>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setNewCliente((prev) => ({ ...prev, id: documentoQuery }));
-                        setShowNewClientModal(true);
-                      }}
-                      className="mt-2"
-                    >
+                    <p className="text-red-600 font-medium mb-3">Cliente no encontrado, ¿desea agregar uno?</p>
+                    <Button variant="secondary" onClick={handleOpenNewClientModal}>
                       <Plus size={16} className="mr-2" /> Agregar nuevo cliente
                     </Button>
                   </div>
                 )}
               </div>
 
-              {/* Prioridad y Medio de Reporte en una línea */}
-              <div className="col-span-1">
+              {/* Prioridad + Medio de Reporte */}
+              <div>
                 <Label>Prioridad <span className="text-meta-1">*</span></Label>
-                <Select
+                <select
                   value={formData.prioridad}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, prioridad: value }))}
-                  options={[{ value: "BAJA", label: "Baja" }, { value: "MEDIA", label: "Media" }, { value: "ALTA", label: "Alta" }, { value: "CRITICA", label: "Crítica" }]}
-                />
+                  onChange={(e) => setFormData((prev) => ({ ...prev, prioridad: e.target.value as any }))}
+                  className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  required
+                >
+                  <option value="" disabled>Selecciona una opción</option>
+                  <option value="BAJA">Baja</option>
+                  <option value="MEDIA">Media</option>
+                  <option value="ALTA">Alta</option>
+                  <option value="CRITICA">Crítica</option>
+                </select>
               </div>
-              <div className="col-span-1">
+
+              <div>
                 <Label>Medio de Reporte <span className="text-meta-1">*</span></Label>
-                <Select
+                <select
                   value={formData.medioReporte}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, medioReporte: value }))}
-                  options={[{ value: "PERSONAL", label: "Personal" }, { value: "TELEFONICO", label: "Telefónico" }, { value: "EMAIL", label: "Email" }, { value: "APP", label: "App" }]}
-                />
+                  onChange={(e) => setFormData((prev) => ({ ...prev, medioReporte: e.target.value }))}
+                  className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  required
+                >
+                  <option value="" disabled>Selecciona una opción</option>
+                  <option value="PERSONAL">Personal</option>
+                  <option value="TELEFONICO">Telefónico</option>
+                  <option value="EMAIL">Email</option>
+                  <option value="APP">App</option>
+                </select>
               </div>
 
-              {/* Tipo PQR y Condición en una línea */}
-              <div className="col-span-1">
+              {/* Tipo PQR + Condición */}
+              <div>
                 <Label>Tipo PQR <span className="text-meta-1">*</span></Label>
-                <Select
+                <select
                   value={formData.tipoPqr}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, tipoPqr: value, condicion: "" }))}
-                  options={[{ value: "PETICION", label: "Petición" }, { value: "QUEJA", label: "Queja" }, { value: "RECLAMO", label: "Reclamo" }, { value: "REPORTE", label: "Reporte" }]}
-                />
-              </div>
-              <div className="col-span-1">
-                <Label>Condición <span className="text-meta-1">*</span></Label>
-                <Select
-                  value={formData.condicion}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, condicion: value }))}
-                  options={getCondiciones().map((cond) => ({ value: cond, label: formatConditionLabel(cond) }))}
-                />
+                  onChange={(e) => setFormData((prev) => ({ ...prev, tipoPqr: e.target.value, condicion: "" }))}
+                  className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  required
+                >
+                  <option value="" disabled>Selecciona una opción</option>
+                  <option value="PETICION">Petición</option>
+                  <option value="QUEJA">Queja</option>
+                  <option value="RECLAMO">Reclamo</option>
+                  <option value="REPORTE">Reporte</option>
+                </select>
               </div>
 
-              {/* Checkbox full width */}
+              <div>
+                <Label>Condición <span className="text-meta-1">*</span></Label>
+                <select
+                  value={formData.condicion}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, condicion: e.target.value }))}
+                  className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  required
+                >
+                  <option value="" disabled>Selecciona una condición</option>
+                  {getCondiciones().map((cond) => (
+                    <option key={cond} value={cond}>{formatConditionLabel(cond)}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Toggle Switch para serie */}
               <div className="col-span-2">
-                <Checkbox
+                <Label>¿Tiene serie de luminaria?</Label>
+                <Switch
                   checked={formData.hasSerie}
                   onChange={(checked) => setFormData((prev) => ({ ...prev, hasSerie: checked }))}
-                >
-                  ¿Tiene serie de luminaria?
-                </Checkbox>
-
+                />
                 {formData.hasSerie && (
-                  <div className="mt-4">
+                  <div className="mt-6">
                     <Label>Número de Serie</Label>
                     <div className="relative">
-                      <Input
+                      <input
                         type="text"
-                        placeholder="Buscar serie de luminaria..."
+                        placeholder="Buscar serie..."
                         value={searchSerie}
-                        onChange={handleSerieChange}
-                        className="w-full pl-10"
+                        onChange={(e) => setSearchSerie(e.target.value)}
+                        className="w-full rounded border-[1.5px] border-stroke bg-transparent pl-10 pr-5 py-3 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
                       />
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                     </div>
 
                     {filteredSeries.length > 0 && (
-                      <div className="mt-4 space-y-2 max-h-40 overflow-y-auto">
+                      <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
                         {filteredSeries.map((inv) => (
                           <div
                             key={inv.serie}
                             onClick={() => handleSelectSerie(inv.serie)}
-                            className="cursor-pointer rounded border border-stroke p-3 hover:bg-gray-50 dark:hover:bg-meta-4 dark:border-strokedark"
+                            className="cursor-pointer rounded border border-stroke p-4 hover:bg-gray-50 dark:hover:bg-meta-4 dark:border-strokedark"
                           >
-                            <p className="font-medium text-black dark:text-white">{inv.serie} - {inv.direccion}</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              Sector: {inv.sector} | Barrio: {inv.barrio}
-                            </p>
+                            <p className="font-medium">{inv.serie} - {inv.direccion}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Sector: {inv.sector} | Barrio: {inv.barrio}</p>
                           </div>
                         ))}
                       </div>
@@ -506,44 +504,50 @@ export default function PqrCreate() {
                 )}
               </div>
 
-              {/* Sector y Barrio en una línea */}
-              <div className="col-span-1">
+              {/* Sector + Barrio */}
+              <div>
                 <Label>Sector <span className="text-meta-1">*</span></Label>
-                <Select
+                <select
                   value={formData.sectorPqr}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, sectorPqr: value }))}
-                  options={[{ value: "CABECERA_MUNICIPAL", label: "Cabecera Municipal" } /* agrega más */ ]}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, sectorPqr: e.target.value }))}
                   disabled={isLocationDisabled}
-                />
+                  className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                >
+                  <option value="" disabled>Selecciona una opción</option>
+                  <option value="CABECERA_MUNICIPAL">Cabecera Municipal</option>
+                  {/* Agrega más opciones según tu enum */}
+                </select>
               </div>
-              <div className="col-span-1">
+
+              <div>
                 <Label>Barrio</Label>
-                <Input
+                <input
                   type="text"
                   value={formData.barrio}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, barrio: value }))}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, barrio: e.target.value }))}
                   disabled={isLocationDisabled}
-                  className="w-full"
+                  className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
                 />
               </div>
 
-              {/* Dirección full width */}
+              {/* Dirección */}
               <div className="col-span-2">
                 <Label>Dirección <span className="text-meta-1">*</span></Label>
-                <Input
+                <input
                   type="text"
                   value={formData.direccionPqr}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, direccionPqr: value }))}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, direccionPqr: e.target.value }))}
                   disabled={isLocationDisabled}
-                  className="w-full mb-4"
+                  className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                  required
                 />
               </div>
 
-              {/* Mapa full width */}
+              {/* Mapa */}
               <div className="col-span-2">
                 <Label>Ubicación Geográfica</Label>
-                <div className="h-64 w-full rounded border border-stroke dark:border-strokedark overflow-hidden">
-                  <MapContainer center={position} zoom={13} style={{ height: "100%", width: "100%" }}>
+                <div className="relative z-10 h-96 w-full rounded border border-stroke dark:border-strokedark overflow-hidden">
+                  <MapContainer center={position} zoom={15} style={{ height: "100%", width: "100%" }}>
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                     <LocationMarker
                       position={position}
@@ -552,27 +556,27 @@ export default function PqrCreate() {
                       setLatLng={(lat, lng) => setFormData((prev) => ({ ...prev, lat, lng }))}
                       disabled={isLocationDisabled}
                     />
-                    <MapResizer />
+                    <MapResizer position={position} hasSerie={formData.hasSerie} />
                   </MapContainer>
                 </div>
               </div>
 
-              {/* Observación full width */}
+              {/* Observación */}
               <div className="col-span-2">
                 <Label>Observación</Label>
                 <TextArea
                   value={formData.observacionPqr}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, observacionPqr: value }))}
-                  className="w-full"
+                  onChange={(e) => setFormData((prev) => ({ ...prev, observacionPqr: e.target.value }))}
+                  rows={4}
                 />
               </div>
 
               {/* Botones */}
               <div className="col-span-2 flex justify-end gap-4">
-                <Button variant="outline" onClick={handleCancel}>
+                <Button variant="secondary" type="button" onClick={() => navigate("/pqrs")}>
                   Cancelar
                 </Button>
-                <Button type="submit" loading={pqrMutation.isPending}>
+                <Button variant="primary" type="submit" loading={pqrMutation.isPending}>
                   Guardar PQR
                 </Button>
               </div>
@@ -581,59 +585,66 @@ export default function PqrCreate() {
         </div>
       </div>
 
-      {/* Modal Crear Nuevo Cliente */}
+      {/* Modal Nuevo Cliente */}
       <FormModal
         isOpen={showNewClientModal}
         onClose={() => setShowNewClientModal(false)}
         title="Crear Nuevo Cliente"
-        widthClass="md:max-w-4xl"
+        widthClass="max-w-4xl"
         footer={
           <>
-            <Button variant="outline" onClick={() => setShowNewClientModal(false)}>
-              Cancelar
-            </Button>
+            <Button variant="secondary" onClick={() => setShowNewClientModal(false)}>Cancelar</Button>
             <Button
+              variant="primary"
               onClick={() => createClienteMutation.mutate(newCliente)}
               loading={createClienteMutation.isPending}
               disabled={!newCliente.id || !newCliente.nombre}
             >
-              Guardar cliente
+              Guardar
             </Button>
           </>
         }
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
+          <InputGroup icon={<BadgeCheck size={18} />}>
             <Label>ID (Documento)</Label>
-            <div className="relative">
-              <Input value={newCliente.id} onChange={(value) => setNewCliente((prev) => ({ ...prev, id: value }))} className="pl-10" />
-              <BadgeCheck className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-            </div>
-          </div>
-          <div>
+            <input
+              value={newCliente.id}
+              onChange={(e) => setNewCliente((prev) => ({ ...prev, id: e.target.value }))}
+              className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+            />
+          </InputGroup>
+          <InputGroup icon={<User size={18} />}>
             <Label>Nombre</Label>
-            <div className="relative">
-              <Input value={newCliente.nombre} onChange={(value) => setNewCliente((prev) => ({ ...prev, nombre: value }))} className="pl-10" />
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-            </div>
-          </div>
-          <div>
+            <input
+              value={newCliente.nombre}
+              onChange={(e) => setNewCliente((prev) => ({ ...prev, nombre: e.target.value }))}
+              className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+            />
+          </InputGroup>
+          <InputGroup icon={<Phone size={18} />}>
             <Label>Teléfono</Label>
-            <div className="relative">
-              <Input value={newCliente.telefono} onChange={(value) => setNewCliente((prev) => ({ ...prev, telefono: value }))} className="pl-10" />
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-            </div>
-          </div>
-          <div>
+            <input
+              value={newCliente.telefono}
+              onChange={(e) => setNewCliente((prev) => ({ ...prev, telefono: e.target.value }))}
+              className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+            />
+          </InputGroup>
+          <InputGroup icon={<Mail size={18} />}>
             <Label>Correo</Label>
-            <div className="relative">
-              <Input value={newCliente.correo} onChange={(value) => setNewCliente((prev) => ({ ...prev, correo: value }))} className="pl-10" />
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-            </div>
-          </div>
+            <input
+              value={newCliente.correo}
+              onChange={(e) => setNewCliente((prev) => ({ ...prev, correo: e.target.value }))}
+              className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+            />
+          </InputGroup>
           <div className="col-span-2">
             <Label>Observación</Label>
-            <TextArea value={newCliente.observacion} onChange={(value) => setNewCliente((prev) => ({ ...prev, observacion: value }))} />
+            <TextArea
+              value={newCliente.observacion}
+              onChange={(e) => setNewCliente((prev) => ({ ...prev, observacion: e.target.value }))}
+              rows={3}
+            />
           </div>
         </div>
       </FormModal>
@@ -643,16 +654,14 @@ export default function PqrCreate() {
         isOpen={showEditClienteModal}
         onClose={() => setShowEditClienteModal(false)}
         title="Editar Cliente"
-        widthClass="md:max-w-4xl"
+        widthClass="max-w-4xl"
         footer={
           <>
-            <Button variant="outline" onClick={() => setShowEditClienteModal(false)}>
-              Cancelar
-            </Button>
+            <Button variant="secondary" onClick={() => setShowEditClienteModal(false)}>Cancelar</Button>
             <Button
+              variant="primary"
               onClick={() => editedCliente && updateClienteMutation.mutate(editedCliente)}
               loading={updateClienteMutation.isPending}
-              disabled={!editedCliente?.id || !editedCliente?.nombre}
             >
               Guardar cambios
             </Button>
@@ -661,37 +670,45 @@ export default function PqrCreate() {
       >
         {editedCliente && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
+            <InputGroup icon={<BadgeCheck size={18} />}>
               <Label>ID (Documento)</Label>
-              <div className="relative">
-                <Input value={editedCliente.id} disabled className="pl-10" />
-                <BadgeCheck className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-              </div>
-            </div>
-            <div>
+              <input
+                value={editedCliente.id}
+                disabled
+                className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:text-white"
+              />
+            </InputGroup>
+            <InputGroup icon={<User size={18} />}>
               <Label>Nombre</Label>
-              <div className="relative">
-                <Input value={editedCliente.nombre} onChange={(value) => setEditedCliente((prev) => prev ? ({ ...prev, nombre: value }) : null)} className="pl-10" />
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-              </div>
-            </div>
-            <div>
+              <input
+                value={editedCliente.nombre}
+                onChange={(e) => setEditedCliente((prev) => prev ? ({ ...prev, nombre: e.target.value }) : null)}
+                className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+              />
+            </InputGroup>
+            <InputGroup icon={<Phone size={18} />}>
               <Label>Teléfono</Label>
-              <div className="relative">
-                <Input value={editedCliente.telefono} onChange={(value) => setEditedCliente((prev) => prev ? ({ ...prev, telefono: value }) : null)} className="pl-10" />
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-              </div>
-            </div>
-            <div>
+              <input
+                value={editedCliente.telefono}
+                onChange={(e) => setEditedCliente((prev) => prev ? ({ ...prev, telefono: e.target.value }) : null)}
+                className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+              />
+            </InputGroup>
+            <InputGroup icon={<Mail size={18} />}>
               <Label>Correo</Label>
-              <div className="relative">
-                <Input value={editedCliente.correo} onChange={(value) => setEditedCliente((prev) => prev ? ({ ...prev, correo: value }) : null)} className="pl-10" />
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-              </div>
-            </div>
+              <input
+                value={editedCliente.correo}
+                onChange={(e) => setEditedCliente((prev) => prev ? ({ ...prev, correo: e.target.value }) : null)}
+                className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 text-black outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+              />
+            </InputGroup>
             <div className="col-span-2">
               <Label>Observación</Label>
-              <TextArea value={editedCliente.observacion} onChange={(value) => setEditedCliente((prev) => prev ? ({ ...prev, observacion: value }) : null)} />
+              <TextArea
+                value={editedCliente.observacion}
+                onChange={(e) => setEditedCliente((prev) => prev ? ({ ...prev, observacion: e.target.value }) : null)}
+                rows={3}
+              />
             </div>
           </div>
         )}

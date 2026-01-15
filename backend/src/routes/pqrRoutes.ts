@@ -27,6 +27,22 @@ router.post('/clientes', authMiddleware, async (req: any, res: any) => {
   }
 });
 
+// Actualizar cliente existente
+router.put('/clientes/:id', authMiddleware, async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    const updatedCliente = await pqrService.updateCliente(id, req.body);
+    res.json(updatedCliente);
+  } catch (error: any) {
+    console.error("Error actualizando cliente:", error);
+    if (error.code === 'P2025') { // Prisma: registro no encontrado
+      res.status(404).json({ error: "Cliente no encontrado" });
+    } else {
+      res.status(400).json({ error: error.message });
+    }
+  }
+});
+
 // Listar inventario (para autocomplete serie)
 router.get('/inventario', authMiddleware, async (req: any, res: any) => {
   try {
