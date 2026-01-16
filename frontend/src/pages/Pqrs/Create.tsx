@@ -25,6 +25,7 @@ import {
   Edit,
   Search,
   Plus,
+  CheckCircle,
 } from "lucide-react";
 
 /* ------------------ INTERFACES ------------------ */
@@ -129,6 +130,7 @@ export default function PqrCreate() {
   const [showEditClienteModal, setShowEditClienteModal] = useState(false);
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const [editedCliente, setEditedCliente] = useState<Cliente | null>(null);
+  const [showPqrSuccessModal, setShowPqrSuccessModal] = useState(false);
 
   const [newCliente, setNewCliente] = useState({
     id: "",
@@ -179,6 +181,7 @@ export default function PqrCreate() {
   useEffect(() => {
     if (documentoQuery.trim() && clientes.length === 0) {
       setClienteNotFound(true);
+      setClienteFound(false);
     } else {
       setClienteNotFound(false);
     }
@@ -234,6 +237,7 @@ export default function PqrCreate() {
       }),
     onSuccess: () => {
       setShowSuccessAlert(true);
+      setShowPqrSuccessModal(true);
       queryClient.invalidateQueries({ queryKey: ["pqrs"] });
       setTimeout(() => {
         setShowSuccessAlert(false);
@@ -325,27 +329,23 @@ export default function PqrCreate() {
       <PageMeta title="Crear PQR | ILUMAP" description="Crear nueva PQR" />
       <PageBreadcrumb pageTitle="Crear PQR" />
 
-      <div className="grid grid-cols-1 gap-9">
-        <div className="card">
-          <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
-            <h3 className="font-medium text-black dark:text-white">
+      <div className="grid grid-cols-1 gap-8">
+        <div className="card shadow-default dark:shadow-card">
+          <div className="border-b border-stroke px-6 py-5 dark:border-strokedark">
+            <h3 className="text-xl font-semibold text-black dark:text-white">
               Información del Cliente y Reporte
             </h3>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6.5 grid grid-cols-1 gap-6 md:grid-cols-2">
+          <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
             {showSuccessAlert && (
-              <div className="col-span-2">
-                <Alert
-                  variant="success"
-                  title="Éxito"
-                  message="PQR creada correctamente. Redirigiendo..."
-                />
+              <div className="col-span-1 lg:col-span-2">
+                <Alert variant="success" title="Éxito" message="PQR creada correctamente. Redirigiendo..." />
               </div>
             )}
 
             {/* Fecha PQR */}
-            <div className="col-span-2 md:col-span-1">
+            <div>
               <Label htmlFor="fechaPqr">Fecha PQR <span className="text-meta-1">*</span></Label>
               <Flatpickr
                 id="fechaPqr"
@@ -358,57 +358,79 @@ export default function PqrCreate() {
             </div>
 
             {/* Cliente (documento) */}
-            <div className="col-span-2">
+            <div className="col-span-1 lg:col-span-2">
               <Label htmlFor="documentoQuery">Cliente (documento) <span className="text-meta-1">*</span></Label>
-              <div className="relative">
-                <input
-                  id="documentoQuery"
-                  type="text"
-                  placeholder="Buscar por documento..."
-                  value={documentoQuery}
-                  onChange={e => setDocumentoQuery(e.target.value)}
-                  className="input-default pl-10"
-                />
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <InputGroup icon={<Search size={18} />}>
+                    <input
+                      id="documentoQuery"
+                      type="text"
+                      placeholder="Buscar por documento..."
+                      value={documentoQuery}
+                      onChange={e => setDocumentoQuery(e.target.value)}
+                      className="input-default"
+                    />
+                  </InputGroup>
+                </div>
+                {clienteNotFound && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleOpenNewClientModal}
+                    className="mb-0.5"
+                  >
+                    <Plus size={16} className="mr-1" /> Agregar
+                  </Button>
+                )}
               </div>
+
+              {/* Mensaje debajo del campo */}
+              {clienteNotFound && (
+                <p className="mt-2 text-sm text-meta-1">Cliente no encontrado. ¿Quieres agregarlo?</p>
+              )}
 
               {/* Resultados búsqueda cliente */}
               {clientes.length > 0 && !clienteFound && (
-                <div className="mt-3 max-h-64 overflow-y-auto rounded border border-stroke dark:border-strokedark">
+                <div className="mt-3 max-h-64 overflow-y-auto rounded border border-stroke bg-white dark:border-strokedark dark:bg-boxdark shadow-sm">
                   {clientes.map(cl => (
                     <div
                       key={cl.id}
                       onClick={() => handleSelectCliente(cl)}
-                      className="cursor-pointer border-b border-stroke p-4 last:border-none hover:bg-gray-50 dark:border-strokedark dark:hover:bg-meta-4/10"
+                      className="cursor-pointer border-b border-stroke p-4 last:border-none hover:bg-gray-50 dark:border-strokedark dark:hover:bg-boxdark-2 transition-colors"
                     >
-                      <p className="font-medium text-black dark:text-white">{cl.id} - {cl.nombre}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {cl.telefono || "—"} | {cl.correo || "—"}
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-black dark:text-white">{cl.id} - {cl.nombre}</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {cl.telefono || "—"} | {cl.correo || "—"}
+                          </p>
+                        </div>
+                        <BadgeCheck className="text-primary" size={20} />
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
 
               {clienteFound && cliente && (
-                <div className="mt-4 rounded border border-stroke bg-gray-50 p-5 dark:border-strokedark dark:bg-boxdark-2">
-                  <div className="mb-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                    <div className="flex items-center gap-2"><BadgeCheck size={16} className="text-primary" /> <span>ID: {cliente.id}</span></div>
-                    <div className="flex items-center gap-2"><User size={16} className="text-primary" /> <span>{cliente.nombre}</span></div>
-                    <div className="flex items-center gap-2"><Phone size={16} className="text-primary" /> <span>{cliente.telefono || "N/A"}</span></div>
-                    <div className="flex items-center gap-2"><Mail size={16} className="text-primary" /> <span>{cliente.correo || "N/A"}</span></div>
+                <div className="mt-4 rounded border border-stroke bg-gray-50 p-5 dark:border-strokedark dark:bg-boxdark-2 shadow-default">
+                  <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <BadgeCheck size={16} className="text-primary" /> <span>ID: {cliente.id}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <User size={16} className="text-primary" /> <span>{cliente.nombre}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone size={16} className="text-primary" /> <span>{cliente.telefono || "N/A"}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Mail size={16} className="text-primary" /> <span>{cliente.correo || "N/A"}</span>
+                    </div>
                   </div>
                   <Button variant="secondary" size="sm" onClick={handleOpenEditModal}>
                     <Edit size={16} className="mr-2" /> Editar cliente
-                  </Button>
-                </div>
-              )}
-
-              {clienteNotFound && (
-                <div className="mt-4">
-                  <p className="mb-3 text-meta-1">Cliente no encontrado. ¿Quieres agregarlo?</p>
-                  <Button variant="secondary" onClick={handleOpenNewClientModal}>
-                    <Plus size={16} className="mr-2" /> Agregar nuevo cliente
                   </Button>
                 </div>
               )}
@@ -484,40 +506,42 @@ export default function PqrCreate() {
             </div>
 
             {/* Switch serie + búsqueda serie */}
-            <div className="col-span-2">
+            <div className="col-span-1 lg:col-span-2">
               <div className="flex items-center justify-between mb-4">
                 <label className="flex items-center gap-3 cursor-pointer select-none">
                   <Switch
                     checked={formData.hasSerie}
                     onChange={checked => setFormData(prev => ({ ...prev, hasSerie: checked }))}
                   />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-400">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     ¿Tiene serie de luminaria?
                   </span>
                 </label>
               </div>
+
               {formData.hasSerie && (
-                <div className="mt-2">
-                  <Label htmlFor="searchSerie">Número de Serie</Label>
-                  <div className="relative mt-2">
-                    <input
-                      id="searchSerie"
-                      type="text"
-                      placeholder="Buscar serie..."
-                      value={searchSerie}
-                      onChange={e => setSearchSerie(e.target.value)}
-                      className="input-default pl-10"
-                    />
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="searchSerie">Número de Serie</Label>
+                    <InputGroup icon={<Search size={18} />}>
+                      <input
+                        id="searchSerie"
+                        type="text"
+                        placeholder="Buscar serie..."
+                        value={searchSerie}
+                        onChange={e => setSearchSerie(e.target.value)}
+                        className="input-default"
+                      />
+                    </InputGroup>
                   </div>
 
                   {filteredSeries.length > 0 && (
-                    <div className="mt-3 max-h-64 overflow-y-auto rounded border border-stroke dark:border-strokedark">
+                    <div className="max-h-64 overflow-y-auto rounded border border-stroke bg-white dark:border-strokedark dark:bg-boxdark shadow-sm">
                       {filteredSeries.map(inv => (
                         <div
                           key={inv.serie}
                           onClick={() => handleSelectSerie(inv.serie)}
-                          className="cursor-pointer border-b border-stroke p-4 last:border-none hover:bg-gray-50 dark:border-strokedark dark:hover:bg-meta-4/10"
+                          className="cursor-pointer border-b border-stroke p-4 last:border-none hover:bg-gray-50 dark:border-strokedark dark:hover:bg-boxdark-2 transition-colors"
                         >
                           <p className="font-medium text-black dark:text-white">{inv.serie}</p>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -530,9 +554,7 @@ export default function PqrCreate() {
                 </div>
               )}
             </div>
-            <div className="bg-boxdark border-strokedark text-meta-4 p-4 rounded">
-              Prueba TailAdmin: debería ser fondo oscuro, borde strokedark y texto azul
-            </div>
+
             {/* Sector, Barrio, Dirección */}
             <div>
               <Label htmlFor="sectorPqr">Sector <span className="text-meta-1">*</span></Label>
@@ -545,7 +567,6 @@ export default function PqrCreate() {
               >
                 <option value="" disabled>Selecciona...</option>
                 <option value="CABECERA_MUNICIPAL">Cabecera Municipal</option>
-                {/* Agrega más opciones según tu backend */}
               </select>
             </div>
 
@@ -561,7 +582,7 @@ export default function PqrCreate() {
               />
             </div>
 
-            <div className="col-span-2">
+            <div className="col-span-1 lg:col-span-2">
               <Label htmlFor="direccionPqr">Dirección <span className="text-meta-1">*</span></Label>
               <input
                 id="direccionPqr"
@@ -575,16 +596,17 @@ export default function PqrCreate() {
             </div>
 
             {/* Mapa */}
-            <div className="col-span-2">
+            <div className="col-span-1 lg:col-span-2">
               <Label>Ubicación Geográfica</Label>
-              <div 
+              <div
                 ref={mapContainerRef}
-                className="mt-2 h-96 w-full overflow-hidden rounded border border-stroke dark:border-strokedark relative z-0"
+                className="mt-2 h-[420px] w-full overflow-hidden rounded-lg border border-stroke dark:border-strokedark shadow-default relative z-0"
               >
-                <MapContainer 
-                  zoom={15} 
+                <MapContainer
+                  zoom={15}
                   style={{ height: "100%", width: "100%" }}
                   scrollWheelZoom={false}
+                  className="rounded-lg"
                 >
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <MapController position={position} />
@@ -601,19 +623,19 @@ export default function PqrCreate() {
             </div>
 
             {/* Observación */}
-            <div className="col-span-2">
+            <div className="col-span-1 lg:col-span-2">
               <Label htmlFor="observacionPqr">Observación</Label>
               <TextArea
                 id="observacionPqr"
                 value={formData.observacionPqr}
                 onChange={e => setFormData(prev => ({ ...prev, observacionPqr: e.target.value }))}
-                rows={4}
-                className="input-default"
+                rows={5}
+                className="input-default resize-y min-h-[140px]"
               />
             </div>
 
             {/* Botones */}
-            <div className="col-span-2 flex justify-end gap-4 mt-6">
+            <div className="col-span-1 lg:col-span-2 flex justify-end gap-4 mt-10">
               <Button variant="secondary" type="button" onClick={() => navigate("/pqrs")}>
                 Cancelar
               </Button>
@@ -635,21 +657,8 @@ export default function PqrCreate() {
         onClose={() => setShowNewClientModal(false)}
         title="Crear Nuevo Cliente"
         widthClass="max-w-4xl"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowNewClientModal(false)}>Cancelar</Button>
-            <Button
-              variant="primary"
-              onClick={() => createClienteMutation.mutate(newCliente)}
-              loading={createClienteMutation.isPending}
-              disabled={!newCliente.id.trim() || !newCliente.nombre.trim()}
-            >
-              Guardar
-            </Button>
-          </>
-        }
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="modal-body grid grid-cols-1 md:grid-cols-2 gap-6">
           <InputGroup icon={<BadgeCheck size={18} />}>
             <Label htmlFor="newClienteId">ID (Documento)</Label>
             <input
@@ -686,16 +695,26 @@ export default function PqrCreate() {
               className="input-default"
             />
           </InputGroup>
-          <div className="col-span-2">
+          <div className="col-span-1 md:col-span-2">
             <Label htmlFor="newClienteObservacion">Observación</Label>
             <TextArea
               id="newClienteObservacion"
               value={newCliente.observacion}
               onChange={(e) => setNewCliente((prev) => ({ ...prev, observacion: e.target.value }))}
-              rows={3}
-              className="input-default"
+              rows={4}
+              className="input-default resize-y min-h-[120px]"
             />
           </div>
+        </div>
+        <div className="modal-footer">
+          <Button variant="secondary" onClick={() => setShowNewClientModal(false)}>Cancelar</Button>
+          <Button
+            variant="primary"
+            onClick={() => createClienteMutation.mutate(newCliente)}
+            disabled={!newCliente.id.trim() || !newCliente.nombre.trim()}
+          >
+            Guardar
+          </Button>
         </div>
       </FormModal>
 
@@ -705,27 +724,15 @@ export default function PqrCreate() {
         onClose={() => setShowEditClienteModal(false)}
         title="Editar Cliente"
         widthClass="max-w-4xl"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowEditClienteModal(false)}>Cancelar</Button>
-            <Button
-              variant="primary"
-              onClick={() => editedCliente && updateClienteMutation.mutate(editedCliente)}
-              loading={updateClienteMutation.isPending}
-            >
-              Guardar cambios
-            </Button>
-          </>
-        }
       >
         {editedCliente && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="modal-body grid grid-cols-1 md:grid-cols-2 gap-6">
             <InputGroup icon={<BadgeCheck size={18} />}>
               <Label>ID (Documento)</Label>
               <input
                 value={editedCliente.id}
                 disabled
-                className="input-default disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-boxdark-2"
+                className="input-default cursor-not-allowed bg-gray-100 dark:bg-gray-800"
               />
             </InputGroup>
             <InputGroup icon={<User size={18} />}>
@@ -733,7 +740,7 @@ export default function PqrCreate() {
               <input
                 id="editNombre"
                 value={editedCliente.nombre}
-                onChange={(e) => setEditedCliente((prev) => prev ? ({ ...prev, nombre: e.target.value }) : null)}
+                onChange={(e) => setEditedCliente(prev => prev ? ({ ...prev, nombre: e.target.value }) : null)}
                 className="input-default"
               />
             </InputGroup>
@@ -742,7 +749,7 @@ export default function PqrCreate() {
               <input
                 id="editTelefono"
                 value={editedCliente.telefono}
-                onChange={(e) => setEditedCliente((prev) => prev ? ({ ...prev, telefono: e.target.value }) : null)}
+                onChange={(e) => setEditedCliente(prev => prev ? ({ ...prev, telefono: e.target.value }) : null)}
                 className="input-default"
               />
             </InputGroup>
@@ -751,22 +758,52 @@ export default function PqrCreate() {
               <input
                 id="editCorreo"
                 value={editedCliente.correo}
-                onChange={(e) => setEditedCliente((prev) => prev ? ({ ...prev, correo: e.target.value }) : null)}
+                onChange={(e) => setEditedCliente(prev => prev ? ({ ...prev, correo: e.target.value }) : null)}
                 className="input-default"
               />
             </InputGroup>
-            <div className="col-span-2">
+            <div className="col-span-1 md:col-span-2">
               <Label htmlFor="editObservacion">Observación</Label>
               <TextArea
                 id="editObservacion"
                 value={editedCliente.observacion}
-                onChange={(e) => setEditedCliente((prev) => prev ? ({ ...prev, observacion: e.target.value }) : null)}
-                rows={3}
-                className="input-default"
+                onChange={(e) => setEditedCliente(prev => prev ? ({ ...prev, observacion: e.target.value }) : null)}
+                rows={4}
+                className="input-default resize-y min-h-[120px]"
               />
             </div>
           </div>
         )}
+        <div className="modal-footer">
+          <Button variant="secondary" onClick={() => setShowEditClienteModal(false)}>Cancelar</Button>
+          <Button
+            variant="primary"
+            onClick={() => editedCliente && updateClienteMutation.mutate(editedCliente)}
+          >
+            Guardar cambios
+          </Button>
+        </div>
+      </FormModal>
+
+      {/* Modal de éxito al crear PQR */}
+      <FormModal
+        isOpen={showPqrSuccessModal}
+        onClose={() => setShowPqrSuccessModal(false)}
+        title="PQR Creada con Éxito"
+        widthClass="max-w-md"
+      >
+        <div className="modal-body text-center py-8">
+          <CheckCircle size={64} className="mx-auto text-green-500 mb-4" />
+          <h3 className="text-xl font-semibold text-black dark:text-white mb-2">¡Bien hecho!</h3>
+          <p className="text-gray-600 dark:text-gray-400">
+            La PQR ha sido registrada correctamente.
+          </p>
+        </div>
+        <div className="modal-footer justify-center">
+          <Button variant="primary" onClick={() => setShowPqrSuccessModal(false)}>
+            Aceptar
+          </Button>
+        </div>
       </FormModal>
     </>
   );

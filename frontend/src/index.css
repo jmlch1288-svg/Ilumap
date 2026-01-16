@@ -28,7 +28,6 @@
 
   --color-boxdark: #1c2434;
   --color-boxdark-2: #242e42;
-
   --color-form-input: #1c2434;
 
   --color-meta-1: #dc3545;
@@ -53,7 +52,9 @@
     border-color: var(--color-gray-200, currentColor);
   }
 
-  html, body, #root {
+  html,
+  body,
+  #root {
     @apply h-full;
   }
 
@@ -109,7 +110,75 @@
   }
 
   .btn-primary {
-    @apply rounded bg-primary py-2.5 px-6 font-medium text-white hover:bg-opacity-90;
+    @apply rounded bg-primary py-2.5 px-6 font-medium text-white hover:bg-opacity-90 transition;
+  }
+
+  .btn-secondary {
+    @apply rounded bg-gray-200 py-2.5 px-6 font-medium text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition;
+  }
+
+  /* InputGroup con icono */
+  .input-group {
+    @apply relative;
+  }
+
+  .input-group .input-default {
+    @apply pl-12;
+  }
+
+  .input-group-icon {
+    @apply absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 pointer-events-none;
+  }
+
+  /* Switch */
+  .switch-wrapper {
+    @apply relative inline-flex h-6 w-11 cursor-pointer rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-gray-900;
+  }
+
+  .switch-bg {
+    @apply absolute mx-auto h-5 w-10 rounded-full bg-gray-200 dark:bg-gray-700;
+  }
+
+  .switch-bg-enabled {
+    @apply bg-primary;
+  }
+
+  .switch-dot {
+    @apply absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform dark:bg-gray-200;
+  }
+
+  .switch-dot-enabled {
+    @apply translate-x-5;
+  }
+
+  /* Alert */
+  .alert {
+    @apply flex items-center gap-3 rounded-lg border p-4 shadow-sm;
+  }
+
+  .alert-success {
+    @apply border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/30 dark:text-green-200;
+  }
+
+  /* FormModal */
+  .modal-backdrop {
+    @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+  }
+
+  .modal-content {
+    @apply relative bg-white dark:bg-boxdark rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto ring-1 ring-black/5 dark:ring-white/10;
+  }
+
+  .modal-header {
+    @apply px-6 py-4 border-b border-stroke dark:border-strokedark flex items-center justify-between sticky top-0 bg-white dark:bg-boxdark z-10 rounded-t-2xl;
+  }
+
+  .modal-body {
+    @apply p-6;
+  }
+
+  .modal-footer {
+    @apply px-6 py-4 border-t border-stroke dark:border-strokedark flex justify-end gap-3 sticky bottom-0 bg-white dark:bg-boxdark z-10 rounded-b-2xl;
   }
 }
 
@@ -132,5 +201,6 @@
 
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
   .bg-right-6 { background-position-x: 1.5rem; }
 }
