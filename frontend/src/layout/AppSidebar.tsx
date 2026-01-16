@@ -16,7 +16,7 @@ import {
 import { useSidebar } from "../context/SidebarContext";
 import SidebarWidget from "./SidebarWidget";
 
-// Fuerza Tailwind a generar clases críticas de TailAdmin (temporal, puedes quitar después de confirmar)
+// Fuerza Tailwind a generar clases críticas (temporal)
 const ForceTailwindClasses = () => (
   <div className="hidden bg-boxdark dark:bg-boxdark-2 border-strokedark text-meta-4 shadow-default shadow-card bg-meta-4/10 dark:text-gray-300" />
 );
@@ -153,64 +153,55 @@ const AppSidebar: React.FC = () => {
   }, [openSubmenu]);
 
   const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
-    setOpenSubmenu((prevOpenSubmenu) => {
-      if (
-        prevOpenSubmenu &&
-        prevOpenSubmenu.type === menuType &&
-        prevOpenSubmenu.index === index
-      ) {
-        return null;
-      }
+    setOpenSubmenu((prev) => {
+      if (prev && prev.type === menuType && prev.index === index) return null;
       return { type: menuType, index };
     });
   };
 
   const renderMenuItems = (items: NavItem[], menuType: "main" | "others") => (
-    <ul className="flex flex-col gap-4">
+    <ul className="flex flex-col gap-2">
       {items.map((nav, index) => (
         <li key={nav.name}>
           {nav.subItems ? (
             <button
               onClick={() => handleSubmenuToggle(index, menuType)}
-              className={`group flex items-center gap-3 rounded-lg px-4 py-3 text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-boxdark-2 ${
-                openSubmenu?.type === menuType && openSubmenu?.index === index
-                  ? "bg-gray-100 dark:bg-boxdark-2"
-                  : ""
-              } ${!isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"}`}
+              className={`group flex items-center gap-3 rounded-lg px-4 py-3 text-gray-700 dark:text-gray-300 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-boxdark-2
+                ${openSubmenu?.type === menuType && openSubmenu?.index === index ? "bg-gray-100 dark:bg-boxdark-2" : ""}
+                ${!isExpanded && !isHovered ? "justify-center" : "justify-start"}`}
             >
-              <span className="flex-shrink-0">{nav.icon}</span>
+              <span className="flex-shrink-0 w-5 h-5">{nav.icon}</span>
               {(isExpanded || isHovered || isMobileOpen) && (
-                <span className="font-medium">{nav.name}</span>
-              )}
-              {(isExpanded || isHovered || isMobileOpen) && (
-                <ChevronDown
-                  className={`ml-auto h-5 w-5 transition-transform ${
-                    openSubmenu?.type === menuType && openSubmenu?.index === index ? "rotate-180" : ""
-                  }`}
-                />
+                <>
+                  <span className="flex-1 font-medium truncate">{nav.name}</span>
+                  <ChevronDown
+                    className={`w-5 h-5 transition-transform duration-200 ${
+                      openSubmenu?.type === menuType && openSubmenu?.index === index ? "rotate-180" : ""
+                    }`}
+                  />
+                </>
               )}
             </button>
           ) : (
             nav.path && (
               <Link
                 to={nav.path}
-                className={`group flex items-center gap-3 rounded-lg px-4 py-3 text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-boxdark-2 ${
-                  isActive(nav.path) ? "bg-gray-100 dark:bg-boxdark-2 font-medium" : ""
-                } ${!isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"}`}
+                className={`group flex items-center gap-3 rounded-lg px-4 py-3 text-gray-700 dark:text-gray-300 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-boxdark-2
+                  ${isActive(nav.path) ? "bg-gray-100 dark:bg-boxdark-2 font-medium" : ""}
+                  ${!isExpanded && !isHovered ? "justify-center" : "justify-start"}`}
               >
-                <span className="flex-shrink-0">{nav.icon}</span>
+                <span className="flex-shrink-0 w-5 h-5">{nav.icon}</span>
                 {(isExpanded || isHovered || isMobileOpen) && (
-                  <span className="font-medium">{nav.name}</span>
+                  <span className="flex-1 font-medium truncate">{nav.name}</span>
                 )}
               </Link>
             )
           )}
+
           {nav.subItems && (isExpanded || isHovered || isMobileOpen) && (
             <div
-              ref={(el) => {
-                subMenuRefs.current[`${menuType}-${index}`] = el;
-              }}
-              className="overflow-hidden transition-all duration-300"
+              ref={(el) => (subMenuRefs.current[`${menuType}-${index}`] = el)}
+              className="overflow-hidden transition-all duration-300 ease-in-out"
               style={{
                 height:
                   openSubmenu?.type === menuType && openSubmenu?.index === index
@@ -223,15 +214,16 @@ const AppSidebar: React.FC = () => {
                   <li key={subItem.name}>
                     <Link
                       to={subItem.path}
-                      className={`block rounded-lg px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-boxdark-2 ${
-                        isActive(subItem.path) ? "bg-gray-100 dark:bg-boxdark-2 font-medium" : ""
-                      }`}
+                      className={`block rounded-lg px-3 py-2 text-sm text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-boxdark-2
+                        ${isActive(subItem.path) ? "bg-gray-100 dark:bg-boxdark-2 font-medium" : ""}`}
                     >
-                      {subItem.name}
-                      <span className="ml-2 flex items-center gap-1">
-                        {subItem.new && <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-800 dark:bg-green-900 dark:text-green-200">new</span>}
-                        {subItem.pro && <span className="rounded bg-purple-100 px-1.5 py-0.5 text-xs text-purple-800 dark:bg-purple-900 dark:text-purple-200">pro</span>}
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span>{subItem.name}</span>
+                        <span className="flex items-center gap-1">
+                          {subItem.new && <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-800 dark:bg-green-900/50 dark:text-green-200">new</span>}
+                          {subItem.pro && <span className="rounded bg-purple-100 px-1.5 py-0.5 text-xs text-purple-800 dark:bg-purple-900/50 dark:text-purple-200">pro</span>}
+                        </span>
+                      </div>
                     </Link>
                   </li>
                 ))}
@@ -245,64 +237,54 @@ const AppSidebar: React.FC = () => {
 
   return (
     <>
-      {/* Fuerza Tailwind a generar clases críticas de TailAdmin */}
       <ForceTailwindClasses />
 
       <aside
-        className={`fixed top-0 left-0 z-50 h-screen bg-white dark:bg-boxdark border-r border-stroke dark:border-strokedark transition-all duration-300 ease-in-out
-          ${isExpanded || isMobileOpen ? "w-[290px]" : isHovered ? "w-[290px]" : "w-[90px]"}
+        className={`fixed top-0 left-0 z-50 h-screen bg-white dark:bg-boxdark border-r border-stroke dark:border-strokedark transition-all duration-300 ease-in-out overflow-hidden
+          ${isExpanded || isMobileOpen ? "w-[280px]" : isHovered ? "w-[280px]" : "w-20"}
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
         onMouseEnter={() => !isExpanded && setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div
-          className={`py-8 flex ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}
-        >
+        {/* Logo */}
+        <div className={`py-6 flex items-center ${!isExpanded && !isHovered ? "justify-center" : "justify-start px-6"}`}>
           <Link to="/">
             {isExpanded || isHovered || isMobileOpen ? (
-              <>
-                <img
-                  className="dark:hidden"
-                  src="/images/logo/logo.svg"
-                  alt="Logo"
-                  width={150}
-                  height={40}
-                />
-                <img
-                  className="hidden dark:block"
-                  src="/images/logo/logo-dark.svg"
-                  alt="Logo"
-                  width={150}
-                  height={40}
-                />
-              </>
+              <img
+                className="dark:hidden"
+                src="/images/logo/logo.svg"
+                alt="Logo"
+                width={150}
+                height={40}
+              />
             ) : (
               <img src="/images/logo/logo-icon.svg" alt="Logo" width={32} height={32} />
             )}
           </Link>
         </div>
 
-        <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
+        {/* Menú */}
+        <div className="flex flex-col overflow-y-auto px-4">
           <nav className="mb-6">
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <div>
                 <h2
-                  className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 dark:text-gray-500 ${
-                    !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+                  className={`mb-4 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 ${
+                    !isExpanded && !isHovered ? "text-center" : "px-2"
                   }`}
                 >
-                  {isExpanded || isHovered || isMobileOpen ? "Menu" : <MoreHorizontal className="size-6" />}
+                  {isExpanded || isHovered || isMobileOpen ? "Menu" : <MoreHorizontal className="w-6 h-6 mx-auto" />}
                 </h2>
                 {renderMenuItems(navItems, "main")}
               </div>
 
               <div>
                 <h2
-                  className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 dark:text-gray-500 ${
-                    !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+                  className={`mb-4 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 ${
+                    !isExpanded && !isHovered ? "text-center" : "px-2"
                   }`}
                 >
-                  {isExpanded || isHovered || isMobileOpen ? "Others" : <MoreHorizontal className="size-6" />}
+                  {isExpanded || isHovered || isMobileOpen ? "Others" : <MoreHorizontal className="w-6 h-6 mx-auto" />}
                 </h2>
                 {renderMenuItems(othersItems, "others")}
               </div>
