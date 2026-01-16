@@ -249,10 +249,9 @@ const AppSidebar: React.FC = () => {
       <ForceTailwindClasses />
 
       <aside
-        className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-boxdark text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-stroke dark:border-strokedark
+        className={`fixed top-0 left-0 z-50 h-screen bg-white dark:bg-boxdark border-r border-stroke dark:border-strokedark transition-all duration-300 ease-in-out
           ${isExpanded || isMobileOpen ? "w-[290px]" : isHovered ? "w-[290px]" : "w-[90px]"}
-          ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0`}
+          ${isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
         onMouseEnter={() => !isExpanded && setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
