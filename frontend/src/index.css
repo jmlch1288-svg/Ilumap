@@ -4,18 +4,9 @@
 @tailwind components;
 @tailwind utilities;
 
-@custom-variant dark (&:is(.dark *));
-
-/* ================================
-   THEME VARIABLES
-================================ */
-@theme {
-  --font-outfit: Outfit, sans-serif;
-
-  --text-sm: 14px;
-  --text-sm--line-height: 20px;
-  --text-theme-xs: 12px;
-  --text-theme-xs--line-height: 18px;
+/* TailAdmin + tus variables en :root */
+:root {
+  --font-outfit: 'Outfit', sans-serif;
 
   --color-brand-50: #ecf3ff;
   --color-brand-100: #dde9ff;
@@ -31,161 +22,7 @@
   --color-gray-700: #344054;
   --color-gray-800: #1d2939;
   --color-gray-900: #101828;
-}
 
-/* ================================
-   BASE
-================================ */
-@layer base {
-  * {
-    border-color: var(--color-gray-200, currentColor);
-  }
-
-  body {
-    @apply relative font-normal bg-gray-50;
-    font-family: var(--font-outfit);
-  }
-}
-
-/* ================================
-   COMPONENTS
-================================ */
-@layer components {
-  .menu-item {
-    @apply relative flex items-center w-full gap-3 px-3 py-2 font-medium rounded-lg text-sm;
-  }
-
-  .menu-item-active {
-    @apply bg-brand-50 text-brand-500 dark:bg-brand-500/10 dark:text-brand-500;
-  }
-
-  .menu-item-inactive {
-    @apply text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5;
-  }
-
-  .menu-item-icon {
-    @apply text-gray-500 group-hover:text-gray-700 dark:text-gray-400;
-  }
-
-  .menu-item-icon-active {
-    @apply text-brand-500;
-  }
-
-  .menu-dropdown-item {
-    @apply relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium;
-  }
-
-  .menu-dropdown-item-active {
-    @apply bg-brand-50 text-brand-500;
-  }
-
-  .menu-dropdown-item-inactive {
-    @apply text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5;
-  }
-
-  .menu-dropdown-badge {
-    @apply block rounded-full px-2.5 py-0.5 text-xs font-medium uppercase text-brand-500;
-  }
-}
-
-/* ================================
-   UTILITIES
-================================ */
-@layer utilities {
-  .text-sm {
-    font-size: var(--text-sm);
-    line-height: var(--text-sm--line-height);
-  
-  }
-
-  .text-theme-xs {
-    font-size: var(--text-theme-xs);
-    line-height: var(--text-theme-xs--line-height);
-  }
-
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: var(--color-gray-300);
-    border-radius: 999px;
-  }
-
-  .bg-theme-primary {
-    background-color: var(--color-brand-500);
-  }
-
-  .text-theme-primary {
-    color: var(--color-brand-500);
-  }
-
-  .bg-theme-soft {
-    background-color: var(--color-brand-50);
-  }
-
-  .border-theme {
-    border-color: var(--color-brand-100);
-  }
-
-    .border-stroke {
-    border-color: var(--color-stroke);
-  }
-
-  .border-strokedark {
-    border-color: var(--color-strokedark);
-  }
-
-  .bg-boxdark {
-    background-color: var(--color-boxdark);
-  }
-
-  .bg-boxdark-2 {
-    background-color: var(--color-boxdark-2);
-  }
-
-  .bg-form-input {
-    background-color: var(--color-form-input);
-  }
-
-  .text-meta-1 {
-    color: var(--color-meta-1);
-  }
-
-  .text-meta-2 {
-    color: var(--color-meta-2);
-  }
-
-  .text-meta-3 {
-    color: var(--color-meta-3);
-  }
-
-  .text-meta-4 {
-    color: var(--color-meta-4);
-  }
-
-  .shadow-default {
-    box-shadow: var(--shadow-default);
-  }
-
-  .shadow-card {
-    box-shadow: var(--shadow-card);
-  }
-
-}
-/* ================================
-   TAILADMIN THEME TOKENS
-================================ */
-@theme {
   --color-stroke: #e2e8f0;
   --color-strokedark: #2e3a47;
 
@@ -203,4 +40,97 @@
   --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
+/* Dark mode adjustments */
+.dark {
+  --color-stroke: #2e3a47;
+  --color-gray-200: #2e3a47;
+  --color-gray-100: #1f2a37;
+}
 
+/* Base styles */
+@layer base {
+  * {
+    border-color: var(--color-gray-200, currentColor);
+  }
+
+  html, body, #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply bg-gray-50 font-outfit text-gray-700 antialiased;
+    font-family: var(--font-outfit);
+  }
+
+  .dark body {
+    @apply bg-boxdark text-gray-300;
+  }
+
+  #root {
+    @apply min-h-screen bg-gray-50 dark:bg-boxdark;
+  }
+}
+
+/* Components reutilizables (estilo TailAdmin) */
+@layer components {
+  .card {
+    @apply rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark;
+  }
+
+  .input-default {
+    @apply 
+      w-full rounded border-[1.5px] border-stroke 
+      bg-transparent px-5 py-3 
+      text-black outline-none transition 
+      focus:border-primary active:border-primary 
+      disabled:cursor-not-allowed disabled:bg-gray-100 disabled:opacity-70
+      dark:border-strokedark 
+      dark:bg-form-input 
+      dark:text-white 
+      dark:focus:border-primary;
+  }
+
+  .select-default {
+    @apply 
+      w-full rounded border-[1.5px] border-stroke 
+      bg-transparent px-5 py-3 
+      text-black outline-none transition 
+      focus:border-primary active:border-primary 
+      disabled:cursor-not-allowed disabled:bg-gray-100 disabled:opacity-70
+      dark:border-strokedark 
+      dark:bg-form-input 
+      dark:text-white 
+      dark:focus:border-primary
+      appearance-none
+      pr-10
+      bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTQiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDE0IDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyLjk1IDFMNyA2LjYgMS4wNSAxIiBzdHJva2U9IiM2NjcwODUiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=')] 
+      bg-no-repeat 
+      bg-right bg-center;
+  }
+
+  .btn-primary {
+    @apply rounded bg-primary py-2.5 px-6 font-medium text-white hover:bg-opacity-90;
+  }
+}
+
+/* Utilities extras */
+@layer utilities {
+  .text-meta-1 { color: var(--color-meta-1); }
+  .text-meta-2 { color: var(--color-meta-2); }
+  .text-meta-3 { color: var(--color-meta-3); }
+  .text-meta-4 { color: var(--color-meta-4); }
+
+  .border-stroke { border-color: var(--color-stroke); }
+  .border-strokedark { border-color: var(--color-strokedark); }
+
+  .bg-boxdark { background-color: var(--color-boxdark); }
+  .bg-boxdark-2 { background-color: var(--color-boxdark-2); }
+  .bg-form-input { background-color: var(--color-form-input); }
+
+  .shadow-default { box-shadow: var(--shadow-default); }
+  .shadow-card { box-shadow: var(--shadow-card); }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .bg-right-6 { background-position-x: 1.5rem; }
+}

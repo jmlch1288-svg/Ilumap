@@ -29,9 +29,14 @@ const LayoutContent: React.FC = () => {
 
 const AppLayout: React.FC = () => {
   return (
-    <SidebarProvider>
-      <LayoutContent />
-    </SidebarProvider>
+    <>
+      {/* Fuerza Tailwind a generar clases críticas de TailAdmin */}
+      <div className="hidden bg-boxdark dark:bg-boxdark-2 border-strokedark text-meta-4 shadow-default shadow-card bg-meta-4/10 dark:text-gray-300"></div>
+
+      <SidebarProvider>
+        <LayoutContent />
+      </SidebarProvider>
+    </>
   );
 };
 

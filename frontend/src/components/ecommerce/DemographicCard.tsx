@@ -21,7 +21,7 @@ export default function DemographicCard() {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             Customers Demographic
           </h3>
-          <p className="mt-1 text-gray-500 text-sm dark:text-gray-400">
+          <p className="mt-1 text-gray-500 text-theme-sm dark:text-gray-400">
             Number of customer based on country
           </p>
         </div>
@@ -65,7 +65,7 @@ export default function DemographicCard() {
               <img src="./images/country/country-01.svg" alt="usa" />
             </div>
             <div>
-              <p className="font-semibold text-gray-800 text-sm dark:text-white/90">
+              <p className="font-semibold text-gray-800 text-theme-sm dark:text-white/90">
                 USA
               </p>
               <span className="block text-gray-500 text-theme-xs dark:text-gray-400">
@@ -78,7 +78,7 @@ export default function DemographicCard() {
             <div className="relative block h-2 w-full max-w-[100px] rounded-sm bg-gray-200 dark:bg-gray-800">
               <div className="absolute left-0 top-0 flex h-full w-[79%] items-center justify-center rounded-sm bg-brand-500 text-xs font-medium text-white"></div>
             </div>
-            <p className="font-medium text-gray-800 text-sm dark:text-white/90">
+            <p className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
               79%
             </p>
           </div>
@@ -90,7 +90,7 @@ export default function DemographicCard() {
               <img src="./images/country/country-02.svg" alt="france" />
             </div>
             <div>
-              <p className="font-semibold text-gray-800 text-sm dark:text-white/90">
+              <p className="font-semibold text-gray-800 text-theme-sm dark:text-white/90">
                 France
               </p>
               <span className="block text-gray-500 text-theme-xs dark:text-gray-400">
@@ -103,7 +103,7 @@ export default function DemographicCard() {
             <div className="relative block h-2 w-full max-w-[100px] rounded-sm bg-gray-200 dark:bg-gray-800">
               <div className="absolute left-0 top-0 flex h-full w-[23%] items-center justify-center rounded-sm bg-brand-500 text-xs font-medium text-white"></div>
             </div>
-            <p className="font-medium text-gray-800 text-sm dark:text-white/90">
+            <p className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
               23%
             </p>
           </div>
